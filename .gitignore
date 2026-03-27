@@ -1,0 +1,15 @@
+.env
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+data/input/
+data/intermediate/
+data/output/
+*.mp4
+*.wav
+*.mov
+*.fcpxml
+*.edl
+documents/
