@@ -5,7 +5,7 @@ Applies the edit plan directly via FFmpeg filter_complex.
 import json
 import subprocess
 from pathlib import Path
-from config.settings import EDIT_PLAN, FINAL_OUTPUT, OUTPUT_DIR
+from config.settings import get_paths
 
 
 def detect_hw_encoder():
@@ -23,9 +23,10 @@ def detect_hw_encoder():
 
 
 def run(source_video: str):
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    paths = get_paths(source_video)
+    paths["output_dir"].mkdir(parents=True, exist_ok=True)
 
-    with open(EDIT_PLAN) as f:
+    with open(paths["edit_plan"]) as f:
         plan = json.load(f)
 
     segments = plan.get("keep_segments", [])
@@ -50,12 +51,12 @@ def run(source_video: str):
         "-b:v", "8000k",
         "-c:a", "aac",
         "-b:a", "192k",
-        str(FINAL_OUTPUT),
+        str(paths["final_output"]),
     ]
 
     print(f"  [L4] Running ffmpeg...")
     subprocess.run(cmd, check=True)
-    print(f"\n[L4] ✓ Final cut → {FINAL_OUTPUT}")
+    print(f"\n[L4] ✓ Final cut → {paths['final_output']}")
 
 
 if __name__ == "__main__":

@@ -23,6 +23,7 @@ def main():
     parser.add_argument("--skip-denoise", action="store_true")
     parser.add_argument("--skip-llm",     action="store_true")
     parser.add_argument("--fps",          type=float, default=30.0)
+    parser.add_argument("--subject",      default="", help="Subject hint for transcript correction")
     parser.add_argument("--layer",        type=int, choices=[1,2,3,4],
                         help="Run only a specific layer (1-4)")
     args = parser.parse_args()
@@ -40,11 +41,11 @@ def main():
 
     if not only or only == 2:
         print("\n▶ LAYER 2 — Decision Agent")
-        run_decision(args.skip_llm)
+        run_decision(args.video, args.skip_llm, args.subject)
 
     if not only or only == 3:
         print("\n▶ LAYER 3 — Metadata Bridge")
-        run_bridge(args.fps)
+        run_bridge(args.video, args.fps)
 
     if not only or only == 4:
         print("\n▶ LAYER 4 — Render")

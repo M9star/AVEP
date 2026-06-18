@@ -6,14 +6,15 @@ Run:  python -m layer3_bridge.bridge
 import json
 import opentimelineio as otio
 from pathlib import Path
-from config.settings import EDIT_PLAN, FCPXML_OUTPUT, EDL_OUTPUT, INTER_DIR
+from config.settings import get_paths
 
 
-def run(fps: float = 30.0):
-    INTER_DIR.mkdir(parents=True, exist_ok=True)
+def run(video_path: str, fps: float = 30.0):
+    paths = get_paths(video_path)
+    paths["inter_dir"].mkdir(parents=True, exist_ok=True)
 
     print("\n[L3] Loading edit plan...")
-    with open(EDIT_PLAN) as f:
+    with open(paths["edit_plan"]) as f:
         plan = json.load(f)
 
     timeline = otio.schema.Timeline(name="AVEP_Edit")
@@ -33,12 +34,12 @@ def run(fps: float = 30.0):
     timeline.tracks.append(track)
 
     # Export FCPXML
-    otio.adapters.write_to_file(timeline, str(FCPXML_OUTPUT))
-    print(f"  [Bridge] FCPXML → {FCPXML_OUTPUT}")
+    otio.adapters.write_to_file(timeline, str(paths["fcpxml_output"]))
+    print(f"  [Bridge] FCPXML → {paths['fcpxml_output']}")
 
     # Export EDL
-    otio.adapters.write_to_file(timeline, str(EDL_OUTPUT))
-    print(f"  [Bridge] EDL    → {EDL_OUTPUT}")
+    otio.adapters.write_to_file(timeline, str(paths["edl_output"]))
+    print(f"  [Bridge] EDL    → {paths['edl_output']}")
 
     print(f"\n[L3] ✓ Done")
 
@@ -46,6 +47,7 @@ def run(fps: float = 30.0):
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="AVEP Layer 3 — Metadata Bridge")
+    parser.add_argument("--video", required=True, help="Path to input video file")
     parser.add_argument("--fps", type=float, default=30.0)
     args = parser.parse_args()
-    run(args.fps)
+    run(args.video, args.fps)

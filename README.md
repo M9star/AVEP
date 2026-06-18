@@ -1,6 +1,89 @@
-# 🎬 AVEP — Autonomous Video Editing Pipeline
+# AVEP — Autonomous Video Editing Pipeline
 
 A 4-layer agentic system that turns raw footage into a polished edit automatically.
+
+## Architecture
+
+```
+Input Video
+    │
+    ▼
+┌─────────────────────────────────────────────────────┐
+│  LAYER 1 — Perception                               │
+│  Whisper transcription → VAD silence detection       │
+│  Timestamp sync correction (auto-detects drift)      │
+│                                                      │
+│  Output:                                             │
+│    raw_words.json        word-by-word + timestamps   │
+│    silence_noise_map.json  silence regions + onsets  │
+│    preview.srt           raw subtitle preview        │
+└──────────────────────────┬──────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────┐
+│  LAYER 2 — Decision Agent (LLM)                      │
+│  Context-aware transcript correction                 │
+│    "caucoss rule" → "Kirchhoff's rule"               │
+│    "register" → "resistor"                           │
+│  Heuristic filler/silence detection                  │
+│  Edit plan generation (keep/remove/zoom segments)    │
+│                                                      │
+│  LLM providers:                                      │
+│    • Claude Code (run inline, no API key needed)     │
+│    • Claude API  (ANTHROPIC_API_KEY)                 │
+│    • OpenAI      (OPENAI_API_KEY)                    │
+│    • Gemini      (GEMINI_API_KEY)                    │
+│                                                      │
+│  Output:                                             │
+│    corrected_transcript.json  fixed domain terms     │
+│    corrected.srt              corrected subtitles    │
+│    edit_plan.json             keep/remove/zoom       │
+└──────────────────────────┬──────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────┐
+│  LAYER 3 — Metadata Bridge                           │
+│  Converts edit_plan.json → NLE timeline formats      │
+│                                                      │
+│  Output:                                             │
+│    timeline.fcpxml       import into DaVinci/FCP     │
+│    timeline.edl          import into any NLE         │
+└──────────────────────────┬──────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────┐
+│  LAYER 4 — Execution                                 │
+│  FFmpeg render with hardware acceleration            │
+│                                                      │
+│  Output:                                             │
+│    final_cut.mp4         rendered video              │
+└─────────────────────────────────────────────────────┘
+```
+
+## Per-Video Output Folders
+
+Each video gets its own output folder named after the source file:
+
+```
+data/
+├── input/
+│   └── College-Physics-Lecture.mp4
+├── intermediate/
+│   └── College-Physics-Lecture/
+│       ├── raw_audio.wav
+│       ├── raw_words.json
+│       ├── silence_noise_map.json
+│       ├── preview.srt
+│       ├── corrected_transcript.json
+│       ├── corrected.srt
+│       ├── perception_output.json
+│       ├── edit_plan.json
+│       ├── timeline.fcpxml
+│       └── timeline.edl
+└── output/
+    └── College-Physics-Lecture/
+        └── final_cut.mp4
+```
 
 ## Quick Start
 
@@ -8,42 +91,58 @@ A 4-layer agentic system that turns raw footage into a polished edit automatical
 # 1. Activate virtual environment
 source .venv/bin/activate
 
-# 2. Add your API key to .env
-nano .env
+# 2. Configure LLM provider in .env
+#    Default: claude (uses ANTHROPIC_API_KEY)
+#    Options: claude, openai, gemini
+echo 'LLM_PROVIDER=claude' >> .env
+echo 'ANTHROPIC_API_KEY=sk-ant-...' >> .env
 
 # 3. Drop a video in data/input/
 cp ~/Desktop/myvideo.mp4 data/input/
 
 # 4. Run the full pipeline
 python pipeline.py --video data/input/myvideo.mp4
+
+# 5. With subject hint for better transcript correction
+python pipeline.py --video data/input/lecture.mp4 --subject "College Physics II"
 ```
 
 ## Run Individual Layers
 
 ```bash
-# Layer 1 only — transcription + silence detection
+# Layer 1 — transcription + silence detection + sync fix
 python pipeline.py --video data/input/myvideo.mp4 --layer 1
 
-# Layer 2 only — decision agent (needs Layer 1 output)
-python pipeline.py --video data/input/myvideo.mp4 --layer 2
+# Layer 1 — skip denoise (faster, less memory)
+python pipeline.py --video data/input/myvideo.mp4 --layer 1 --skip-denoise
 
-# Layer 2 without LLM (heuristics only, free)
+# Layer 2 — transcript correction + edit plan (needs Layer 1 output)
+python pipeline.py --video data/input/myvideo.mp4 --layer 2 --subject "Physics"
+
+# Layer 2 — heuristics only, no LLM
 python pipeline.py --video data/input/myvideo.mp4 --layer 2 --skip-llm
 
-# Layer 3 only — generate FCPXML/EDL
+# Layer 3 — generate FCPXML/EDL
 python pipeline.py --video data/input/myvideo.mp4 --layer 3
 
-# Layer 4 only — render final cut
+# Layer 4 — render final cut
 python pipeline.py --video data/input/myvideo.mp4 --layer 4
 ```
 
-## Intermediate Files
+## Using with Claude Code
 
-All intermediate outputs land in `data/intermediate/`:
-- `perception_output.json` — transcript + silence map
-- `edit_plan.json` — LLM edit decisions
-- `timeline.fcpxml` — import into DaVinci Resolve
-- `timeline.edl` — import into any NLE
+Layer 2 LLM work can be done directly in Claude Code without an API key.
+Run Layer 1 first, then ask Claude Code to:
+
+1. Read `raw_words.json` and correct misheard domain terms
+2. Generate `corrected_transcript.json` and `corrected.srt`
+3. Generate `edit_plan.json` with keep/remove/zoom segments
+
+## Import to Premiere Pro / DaVinci Resolve
+
+- **SRT subtitles**: Import `corrected.srt` — creates a captions track
+- **FCPXML timeline**: Import `timeline.fcpxml` into DaVinci Resolve or FCP
+- **EDL timeline**: Import `timeline.edl` into any NLE
 
 ## GPU Support
 
@@ -52,3 +151,13 @@ All intermediate outputs land in `data/intermediate/`:
 | Apple Silicon  | mps            | h264_videotoolbox    |
 | NVIDIA GPU     | cuda           | h264_nvenc           |
 | CPU only       | cpu            | libx264              |
+
+## LLM Providers
+
+Set `LLM_PROVIDER` in `.env`:
+
+| Provider | Env Var           | Model           | Cost (per 1M tokens) |
+|----------|-------------------|-----------------|----------------------|
+| claude   | ANTHROPIC_API_KEY | Sonnet 4.6      | $3 / $15             |
+| openai   | OPENAI_API_KEY    | GPT-4o          | $5 / $15             |
+| gemini   | GEMINI_API_KEY    | Gemini 1.5 Pro  | varies               |

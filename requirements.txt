@@ -6,6 +6,7 @@ silero-vad
 deepfilternet
 
 # Layer 2 — Decision
+anthropic>=0.109.0
 openai>=1.0.0
 google-generativeai
 python-dotenv

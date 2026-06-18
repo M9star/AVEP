@@ -1,6 +1,6 @@
 """
 Layer 2 — LLM Decision Agent
-Sends transcript to Gemini or GPT-4o and returns structured edit plan.
+Sends transcript to Claude, Gemini, or GPT-4o and returns structured edit plan.
 """
 import os, json
 from pathlib import Path
@@ -19,12 +19,79 @@ def call_llm(perception_data: dict) -> dict:
         "silences": perception_data["silences"],
     }, indent=2)
 
-    if LLM_PROVIDER == "openai":
+    if LLM_PROVIDER == "claude":
+        return _call_claude(system_prompt, user_content)
+    elif LLM_PROVIDER == "openai":
         return _call_openai(system_prompt, user_content)
     elif LLM_PROVIDER == "gemini":
         return _call_gemini(system_prompt, user_content)
     else:
         raise ValueError(f"Unknown LLM_PROVIDER: {LLM_PROVIDER}")
+
+
+def _call_claude(system: str, user: str) -> dict:
+    import anthropic
+    client = anthropic.Anthropic()
+    print("  [Agent] Calling Claude Sonnet 4.6...")
+    resp = client.messages.create(
+        model="claude-sonnet-4-6",
+        max_tokens=16000,
+        system=system,
+        messages=[{"role": "user", "content": user}],
+        output_config={
+            "format": {
+                "type": "json_schema",
+                "schema": {
+                    "type": "object",
+                    "properties": {
+                        "keep_segments": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "start": {"type": "number"},
+                                    "end": {"type": "number"},
+                                    "reason": {"type": "string"},
+                                },
+                                "required": ["start", "end", "reason"],
+                                "additionalProperties": False,
+                            },
+                        },
+                        "remove_segments": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "start": {"type": "number"},
+                                    "end": {"type": "number"},
+                                    "reason": {"type": "string"},
+                                },
+                                "required": ["start", "end", "reason"],
+                                "additionalProperties": False,
+                            },
+                        },
+                        "flag_zoom": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "start": {"type": "number"},
+                                    "end": {"type": "number"},
+                                    "reason": {"type": "string"},
+                                },
+                                "required": ["start", "end", "reason"],
+                                "additionalProperties": False,
+                            },
+                        },
+                    },
+                    "required": ["keep_segments", "remove_segments", "flag_zoom"],
+                    "additionalProperties": False,
+                },
+            }
+        },
+    )
+    text = next(b.text for b in resp.content if b.type == "text")
+    return json.loads(text)
 
 
 def _call_openai(system: str, user: str) -> dict:

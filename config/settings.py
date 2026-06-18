@@ -22,10 +22,33 @@ FCPXML_OUTPUT     = INTER_DIR / "timeline.fcpxml"
 EDL_OUTPUT        = INTER_DIR / "timeline.edl"
 FINAL_OUTPUT      = OUTPUT_DIR / "final_cut.mp4"
 
+
+def get_paths(video_path: str) -> dict:
+    """Return per-video output paths using video filename as subfolder."""
+    stem = Path(video_path).stem
+    inter = INTER_DIR / stem
+    out   = OUTPUT_DIR / stem
+    return {
+        "inter_dir":             inter,
+        "output_dir":            out,
+        "raw_audio":             inter / "raw_audio.wav",
+        "clean_audio":           inter / "clean_audio.wav",
+        "perception_output":     inter / "perception_output.json",
+        "raw_words":             inter / "raw_words.json",
+        "silence_noise_map":     inter / "silence_noise_map.json",
+        "corrected_transcript":  inter / "corrected_transcript.json",
+        "preview_srt":           inter / "preview.srt",
+        "corrected_srt":         inter / "corrected.srt",
+        "edit_plan":             inter / "edit_plan.json",
+        "fcpxml_output":         inter / "timeline.fcpxml",
+        "edl_output":            inter / "timeline.edl",
+        "final_output":          out   / "final_cut.mp4",
+    }
+
 # ── Models ───────────────────────────────────────────────────────────────────
 WHISPER_MODEL  = os.getenv("WHISPER_MODEL", "large-v3")
 DEVICE         = os.getenv("DEVICE", "AUTO")   # AUTO = detect at runtime
-LLM_PROVIDER   = os.getenv("LLM_PROVIDER", "openai")
+LLM_PROVIDER   = os.getenv("LLM_PROVIDER", "claude")
 
 # ── Decision Thresholds ──────────────────────────────────────────────────────
 SILENCE_THRESHOLD_SEC = 0.8      # silences longer than this get removed
