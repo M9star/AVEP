@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AVEP — Video Editing Pipeline</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0f1117;
+      color: #e1e4e8;
+      min-height: 100vh;
+    }
+
+    header {
+      background: linear-gradient(135deg, #1a1e2e, #252a3a);
+      border-bottom: 1px solid #30363d;
+      padding: 1.2rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    header h1 { font-size: 1.4rem; font-weight: 600; }
+    header h1 span { color: #58a6ff; }
+    .header-status {
+      font-size: 0.85rem;
+      color: #8b949e;
+    }
+    .header-status .dot {
+      display: inline-block;
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #3fb950;
+      margin-right: 6px;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 2rem;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+    }
+    .full-width { grid-column: 1 / -1; }
+
+    .card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 10px;
+      padding: 1.5rem;
+    }
+    .card h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+      color: #c9d1d9;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .card h2 .icon { font-size: 1.1rem; }
+
+    /* Upload */
+    .upload-zone {
+      border: 2px dashed #30363d;
+      border-radius: 8px;
+      padding: 2rem;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .upload-zone:hover, .upload-zone.dragover {
+      border-color: #58a6ff;
+      background: rgba(88, 166, 255, 0.05);
+    }
+    .upload-zone p { color: #8b949e; margin-top: 0.5rem; font-size: 0.85rem; }
+    .upload-zone .big-icon { font-size: 2.5rem; }
+
+    /* Tabs */
+    .tabs {
+      display: flex;
+      gap: 0.4rem;
+      margin-bottom: 1rem;
+      border-bottom: 1px solid #21262d;
+    }
+    .tab {
+      background: none;
+      border: none;
+      color: #8b949e;
+      padding: 0.5rem 0.8rem;
+      font-size: 0.85rem;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+    }
+    .tab.active { color: #58a6ff; border-bottom-color: #58a6ff; }
+    .tab:hover { color: #c9d1d9; }
+
+    .server-file {
+      display: flex;
+      align-items: center;
+      padding: 0.6rem 0.7rem;
+      border-radius: 6px;
+      font-size: 0.83rem;
+      cursor: pointer;
+      border: 1px solid #21262d;
+      background: #0d1117;
+      margin-bottom: 0.4rem;
+      transition: all 0.15s;
+    }
+    .server-file:hover { border-color: #58a6ff; background: rgba(88,166,255,0.06); }
+    .server-file.selected { border-color: #58a6ff; background: rgba(88,166,255,0.12); }
+    .server-file .name { flex: 1; }
+    .server-file .size { color: #8b949e; font-size: 0.75rem; }
+
+    .upload-options {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.8rem;
+      margin-top: 1rem;
+    }
+    .upload-options label {
+      font-size: 0.8rem;
+      color: #8b949e;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .upload-options input[type="text"],
+    .upload-options input[type="number"],
+    .upload-options select {
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 6px 10px;
+      color: #e1e4e8;
+      font-size: 0.85rem;
+    }
+    .upload-options .checkbox-row {
+      flex-direction: row;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .file-selected {
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+      padding: 0.8rem;
+      background: rgba(88, 166, 255, 0.08);
+      border-radius: 6px;
+      margin-top: 0.8rem;
+    }
+    .file-selected .name { font-size: 0.9rem; flex: 1; }
+    .file-selected .size { font-size: 0.8rem; color: #8b949e; }
+    .file-selected .remove {
+      background: none; border: none; color: #f85149;
+      cursor: pointer; font-size: 1.1rem;
+    }
+
+    .btn {
+      background: #238636;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 10px 20px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      width: 100%;
+      margin-top: 1rem;
+      transition: background 0.2s;
+    }
+    .btn:hover { background: #2ea043; }
+    .btn:disabled { background: #21262d; color: #484f58; cursor: not-allowed; }
+
+    /* Queue */
+    .queue-item {
+      display: flex;
+      align-items: center;
+      padding: 0.7rem 0.8rem;
+      border-radius: 6px;
+      margin-bottom: 0.5rem;
+      background: #0d1117;
+      border: 1px solid #21262d;
+    }
+    .queue-item .pos {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: #58a6ff;
+      min-width: 28px;
+    }
+    .queue-item .name { flex: 1; font-size: 0.85rem; }
+    .queue-item .badge {
+      font-size: 0.7rem;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-weight: 600;
+    }
+    .badge-processing { background: rgba(210, 153, 34, 0.2); color: #d29922; }
+    .badge-queued { background: rgba(139, 148, 158, 0.15); color: #8b949e; }
+    .badge-completed { background: rgba(63, 185, 80, 0.15); color: #3fb950; }
+    .badge-failed { background: rgba(248, 81, 73, 0.15); color: #f85149; }
+
+    .empty-state {
+      text-align: center;
+      color: #484f58;
+      padding: 2rem;
+      font-size: 0.85rem;
+    }
+
+    /* Pipeline Progress */
+    .pipeline-card { display: none; }
+    .pipeline-card.active { display: block; }
+
+    .layer-row {
+      display: flex;
+      align-items: center;
+      padding: 0.8rem;
+      border-radius: 6px;
+      margin-bottom: 0.5rem;
+      background: #0d1117;
+      border: 1px solid #21262d;
+    }
+    .layer-row .layer-num {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      background: #21262d;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+      font-weight: 700;
+      margin-right: 0.8rem;
+      flex-shrink: 0;
+    }
+    .layer-row.running .layer-num { background: #d29922; color: #0d1117; }
+    .layer-row.completed .layer-num { background: #3fb950; color: #0d1117; }
+    .layer-row.failed .layer-num { background: #f85149; color: #0d1117; }
+
+    .layer-info { flex: 1; }
+    .layer-info .layer-name { font-size: 0.85rem; font-weight: 500; }
+    .layer-info .layer-time {
+      font-size: 0.78rem;
+      color: #8b949e;
+      transition: color 0.3s;
+    }
+    .layer-row.running .layer-time { color: #d29922; }
+    .layer-bar {
+      margin-top: 6px;
+      height: 5px;
+      background: #21262d;
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .layer-bar-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #d29922, #3fb950);
+      transition: width 0.3s ease;
+    }
+
+    .layer-status-icon { font-size: 1rem; margin-left: 0.5rem; }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+    .pulse-dot {
+      display: inline-block;
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: #d29922;
+      margin-right: 6px;
+      animation: pulse 1.2s ease-in-out infinite;
+    }
+    .spinner {
+      display: inline-block;
+      width: 16px; height: 16px;
+      border: 2px solid #30363d;
+      border-top-color: #d29922;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    /* Files */
+    .file-list { max-height: 300px; overflow-y: auto; }
+    .file-row {
+      display: flex;
+      align-items: center;
+      padding: 0.5rem 0.7rem;
+      border-radius: 4px;
+      font-size: 0.82rem;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .file-row:hover { background: rgba(88, 166, 255, 0.08); }
+    .file-row .file-icon { margin-right: 0.6rem; }
+    .file-row .file-name { flex: 1; }
+    .file-row .file-size { color: #8b949e; font-size: 0.75rem; }
+
+    /* Logs */
+    .log-area {
+      background: #0d1117;
+      border: 1px solid #21262d;
+      border-radius: 6px;
+      padding: 0.8rem;
+      max-height: 200px;
+      overflow-y: auto;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 0.78rem;
+      line-height: 1.6;
+    }
+    .log-entry { color: #8b949e; }
+    .log-entry.info { color: #58a6ff; }
+    .log-entry.success { color: #3fb950; }
+    .log-entry.error { color: #f85149; }
+    .log-entry .ts { color: #484f58; margin-right: 0.5rem; }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .container { grid-template-columns: 1fr; padding: 1rem; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1><span>AVEP</span> — Video Editing Pipeline</h1>
+    <div class="header-status">
+      <span class="dot" id="serverDot"></span>
+      <span id="serverStatus">Connected</span>
+    </div>
+  </header>
+
+  <div class="container">
+    <!-- Upload Card -->
+    <div class="card">
+      <h2><span class="icon">+</span> Add Video</h2>
+
+      <div class="tabs">
+        <button class="tab active" id="tabUpload" onclick="switchTab('upload')">Upload File</button>
+        <button class="tab" id="tabServer" onclick="switchTab('server')">Pick from data/input</button>
+      </div>
+
+      <!-- Upload pane -->
+      <div id="paneUpload">
+        <div class="upload-zone" id="uploadZone">
+          <div class="big-icon">^</div>
+          <p>Drop video here or click to browse</p>
+          <p>.mp4 .mov .mkv .avi .webm</p>
+        </div>
+        <input type="file" id="fileInput" accept=".mp4,.mov,.mkv,.avi,.webm" hidden>
+        <div id="filePreview"></div>
+      </div>
+
+      <!-- Server file pane -->
+      <div id="paneServer" style="display:none">
+        <div class="file-list" id="serverFileList" style="margin-bottom:0.5rem">
+          <div class="empty-state">Loading files in data/input...</div>
+        </div>
+        <p style="font-size:0.75rem;color:#8b949e">No upload needed — instant queue for files already on the server.</p>
+      </div>
+
+      <div class="upload-options">
+        <label>
+          Subject hint
+          <input type="text" id="optSubject" placeholder="e.g. College Physics II">
+        </label>
+        <label>
+          LLM Provider
+          <select id="optLlmProvider">
+            <option value="">Server default</option>
+            <optgroup label="Local (free)" id="ollamaGroup">
+            </optgroup>
+            <optgroup label="Cloud">
+              <option value="claude_code">Claude Code (no API key)</option>
+              <option value="claude">Claude API</option>
+              <option value="openai">OpenAI GPT-4o</option>
+              <option value="gemini">Gemini 2.0 Flash</option>
+            </optgroup>
+          </select>
+        </label>
+        <label class="checkbox-row">
+          <input type="checkbox" id="optSkipDenoise"> Skip denoise
+        </label>
+        <label class="checkbox-row">
+          <input type="checkbox" id="optSkipLlm"> Skip LLM
+        </label>
+      </div>
+
+      <button class="btn" id="uploadBtn" disabled>Upload & Process</button>
+    </div>
+
+    <!-- Queue Card -->
+    <div class="card">
+      <h2><span class="icon">|||</span> Job Queue</h2>
+      <div id="queueList">
+        <div class="empty-state">No jobs in queue</div>
+      </div>
+    </div>
+
+    <!-- Pipeline Progress -->
+    <div class="card full-width pipeline-card" id="pipelineCard">
+      <h2>
+        <span class="icon">></span>
+        Pipeline Progress — <span id="pipelineJobId"></span>
+      </h2>
+      <div id="layerProgress"></div>
+    </div>
+
+    <!-- Output Files -->
+    <div class="card pipeline-card" id="filesCard">
+      <h2><span class="icon">F</span> Output Files</h2>
+      <div class="file-list" id="filesList">
+        <div class="empty-state">Files appear after processing</div>
+      </div>
+    </div>
+
+    <!-- Event Log -->
+    <div class="card pipeline-card" id="logCard">
+      <h2><span class="icon">#</span> Event Log</h2>
+      <div class="log-area" id="logArea"></div>
+    </div>
+  </div>
+
+  <script>
+    const API = '';
+    let selectedFile = null;       // local File for upload
+    let selectedServerFile = null; // filename already on server
+    let mode = 'upload';           // 'upload' | 'server'
+    let activeJobId = null;
+    let eventSource = null;
+
+    // Tab switching
+    function switchTab(which) {
+      mode = which;
+      document.getElementById('tabUpload').classList.toggle('active', which === 'upload');
+      document.getElementById('tabServer').classList.toggle('active', which === 'server');
+      document.getElementById('paneUpload').style.display = which === 'upload' ? 'block' : 'none';
+      document.getElementById('paneServer').style.display = which === 'server' ? 'block' : 'none';
+      updateBtnState();
+      if (which === 'server') loadServerFiles();
+    }
+
+    function updateBtnState() {
+      if (mode === 'upload') {
+        uploadBtn.disabled = !selectedFile;
+        uploadBtn.textContent = 'Upload & Process';
+      } else {
+        uploadBtn.disabled = !selectedServerFile;
+        uploadBtn.textContent = 'Queue & Process';
+      }
+    }
+
+    // Upload zone
+    const uploadZone = document.getElementById('uploadZone');
+    const fileInput = document.getElementById('fileInput');
+    const uploadBtn = document.getElementById('uploadBtn');
+
+    uploadZone.addEventListener('click', () => fileInput.click());
+    uploadZone.addEventListener('dragover', e => {
+      e.preventDefault();
+      uploadZone.classList.add('dragover');
+    });
+    uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragover'));
+    uploadZone.addEventListener('drop', e => {
+      e.preventDefault();
+      uploadZone.classList.remove('dragover');
+      if (e.dataTransfer.files.length) selectFile(e.dataTransfer.files[0]);
+    });
+    fileInput.addEventListener('change', () => {
+      if (fileInput.files.length) selectFile(fileInput.files[0]);
+    });
+
+    function selectFile(file) {
+      selectedFile = file;
+      const size = (file.size / 1024 / 1024).toFixed(1);
+      document.getElementById('filePreview').innerHTML = `
+        <div class="file-selected">
+          <span class="name">${file.name}</span>
+          <span class="size">${size} MB</span>
+          <button class="remove" onclick="clearFile()">&times;</button>
+        </div>`;
+      updateBtnState();
+    }
+
+    function clearFile() {
+      selectedFile = null;
+      fileInput.value = '';
+      document.getElementById('filePreview').innerHTML = '';
+      updateBtnState();
+    }
+
+    // Server-side files
+    async function loadServerFiles() {
+      const list = document.getElementById('serverFileList');
+      try {
+        const res = await fetch(`${API}/input-files`);
+        const data = await res.json();
+        if (!data.files.length) {
+          list.innerHTML = '<div class="empty-state">No videos in data/input/</div>';
+          return;
+        }
+        list.innerHTML = data.files.map(f => `
+          <div class="server-file" data-name="${f.name}" onclick="selectServerFile('${f.name.replace(/'/g, "\\'")}', this)">
+            <span class="name">${f.name}</span>
+            <span class="size">${f.size_mb} MB</span>
+          </div>`).join('');
+      } catch (e) {
+        list.innerHTML = '<div class="empty-state">Failed to load files</div>';
+      }
+    }
+
+    function selectServerFile(name, el) {
+      selectedServerFile = name;
+      document.querySelectorAll('.server-file').forEach(x => x.classList.remove('selected'));
+      el.classList.add('selected');
+      updateBtnState();
+    }
+
+    // Submit (both modes)
+    uploadBtn.addEventListener('click', async () => {
+      const form = new FormData();
+      form.append('subject', document.getElementById('optSubject').value);
+      form.append('skip_denoise', document.getElementById('optSkipDenoise').checked);
+      form.append('skip_llm', document.getElementById('optSkipLlm').checked);
+      const llmProvider = document.getElementById('optLlmProvider').value;
+      if (llmProvider) form.append('llm_provider', llmProvider);
+
+      let endpoint;
+      uploadBtn.disabled = true;
+      if (mode === 'upload') {
+        if (!selectedFile) return;
+        uploadBtn.textContent = 'Uploading...';
+        form.append('video', selectedFile);
+        endpoint = '/upload';
+      } else {
+        if (!selectedServerFile) return;
+        uploadBtn.textContent = 'Queueing...';
+        form.append('filename', selectedServerFile);
+        endpoint = '/process';
+      }
+
+      try {
+        const res = await fetch(`${API}${endpoint}`, { method: 'POST', body: form });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Request failed');
+
+        if (mode === 'upload') clearFile();
+        else { selectedServerFile = null; document.querySelectorAll('.server-file').forEach(x => x.classList.remove('selected')); }
+        updateBtnState();
+
+        activeJobId = data.job_id;
+        showPipeline(data.job_id);
+        connectSSE(data.job_id);
+        refreshQueue();
+      } catch (err) {
+        alert('Error: ' + err.message);
+        updateBtnState();
+      }
+    });
+
+    // SSE connection
+    function connectSSE(jobId) {
+      if (eventSource) eventSource.close();
+      eventSource = new EventSource(`${API}/jobs/${jobId}/stream`);
+
+      eventSource.addEventListener('pipeline_started', e => {
+        addLog('Pipeline started', 'info');
+        refreshQueue();
+      });
+
+      eventSource.addEventListener('layer_started', e => {
+        const d = JSON.parse(e.data);
+        addLog(`Layer ${d.layer} started: ${d.name}`, 'info');
+        updateLayerStatus(d.layer, 'running');
+        refreshQueue();
+      });
+
+      eventSource.addEventListener('layer_progress', e => {
+        const d = JSON.parse(e.data);
+        updateLayerProgress(d.layer, d.message, d.pct);
+      });
+
+      eventSource.addEventListener('layer_completed', e => {
+        const d = JSON.parse(e.data);
+        addLog(`Layer ${d.layer} completed: ${d.name}`, 'success');
+        updateLayerStatus(d.layer, 'completed');
+      });
+
+      eventSource.addEventListener('layer_failed', e => {
+        const d = JSON.parse(e.data);
+        addLog(`Layer ${d.layer} FAILED: ${d.error}`, 'error');
+        updateLayerStatus(d.layer, 'failed');
+      });
+
+      eventSource.addEventListener('pipeline_completed', e => {
+        addLog('Pipeline completed!', 'success');
+        eventSource.close();
+        loadJobFiles(jobId);
+        refreshQueue();
+      });
+
+      eventSource.addEventListener('pipeline_failed', e => {
+        const d = JSON.parse(e.data);
+        addLog(`Pipeline failed at layer ${d.failed_at_layer}`, 'error');
+        eventSource.close();
+        refreshQueue();
+      });
+
+      eventSource.onerror = () => {
+        addLog('SSE connection lost', 'error');
+      };
+    }
+
+    // Show pipeline progress card
+    function showPipeline(jobId) {
+      document.getElementById('pipelineJobId').textContent = jobId;
+      document.querySelectorAll('.pipeline-card').forEach(c => c.classList.add('active'));
+
+      const layers = [
+        { num: 1, name: 'Perception — Speech to Text' },
+        { num: 2, name: 'Decision — Edit Planning' },
+        { num: 3, name: 'Metadata Bridge — Timeline Export' },
+        { num: 4, name: 'Render — Final Cut' },
+      ];
+
+      document.getElementById('layerProgress').innerHTML = layers.map(l => `
+        <div class="layer-row" id="layer-${l.num}">
+          <div class="layer-num">${l.num}</div>
+          <div class="layer-info">
+            <div class="layer-name">${l.name}</div>
+            <div class="layer-time" id="layer-time-${l.num}">Waiting...</div>
+            <div class="layer-bar" id="layer-bar-${l.num}" style="display:none">
+              <div class="layer-bar-fill" id="layer-bar-fill-${l.num}"></div>
+            </div>
+          </div>
+          <div class="layer-status-icon" id="layer-icon-${l.num}"></div>
+        </div>
+      `).join('');
+
+      document.getElementById('logArea').innerHTML = '';
+      document.getElementById('filesList').innerHTML = '<div class="empty-state">Files appear after processing</div>';
+    }
+
+    function updateLayerStatus(num, status) {
+      const row = document.getElementById(`layer-${num}`);
+      const icon = document.getElementById(`layer-icon-${num}`);
+      const time = document.getElementById(`layer-time-${num}`);
+      if (!row) return;
+
+      row.className = `layer-row ${status}`;
+      if (status === 'running') {
+        icon.innerHTML = '<span class="spinner"></span>';
+        time.textContent = 'Processing...';
+      } else if (status === 'completed') {
+        icon.textContent = 'OK';
+        icon.style.color = '#3fb950';
+        time.textContent = 'Done';
+        const bar = document.getElementById(`layer-bar-${num}`);
+        if (bar) bar.style.display = 'none';
+      } else if (status === 'failed') {
+        icon.textContent = 'X';
+        icon.style.color = '#f85149';
+        time.textContent = 'Failed';
+      }
+    }
+
+    function updateLayerProgress(num, message, pct) {
+      const time = document.getElementById(`layer-time-${num}`);
+      const bar = document.getElementById(`layer-bar-${num}`);
+      const fill = document.getElementById(`layer-bar-fill-${num}`);
+      if (!time) return;
+      time.innerHTML = `<span class="pulse-dot"></span>${message}`;
+      if (pct !== null && pct !== undefined && bar && fill) {
+        bar.style.display = 'block';
+        fill.style.width = `${pct}%`;
+      }
+    }
+
+    // Log
+    function addLog(msg, type = '') {
+      const area = document.getElementById('logArea');
+      const ts = new Date().toLocaleTimeString();
+      area.innerHTML += `<div class="log-entry ${type}"><span class="ts">${ts}</span>${msg}</div>`;
+      area.scrollTop = area.scrollHeight;
+    }
+
+    // Queue
+    async function refreshQueue() {
+      try {
+        const [queueRes, jobsRes] = await Promise.all([
+          fetch(`${API}/queue`),
+          fetch(`${API}/jobs`)
+        ]);
+        const queue = await queueRes.json();
+        const allJobs = await jobsRes.json();
+
+        const list = document.getElementById('queueList');
+        if (allJobs.length === 0) {
+          list.innerHTML = '<div class="empty-state">No jobs yet</div>';
+          return;
+        }
+
+        let html = '';
+
+        allJobs.reverse().forEach(j => {
+          let badgeClass = 'badge-queued';
+          let badgeText = j.status;
+          if (j.status === 'running') { badgeClass = 'badge-processing'; badgeText = 'processing'; }
+          else if (j.status === 'completed') { badgeClass = 'badge-completed'; }
+          else if (j.status === 'failed') { badgeClass = 'badge-failed'; }
+
+          const isActive = j.job_id === activeJobId ? 'style="border-color:#58a6ff"' : '';
+          html += `
+            <div class="queue-item" ${isActive} onclick="viewJob('${j.job_id}')">
+              <span class="pos">${j.job_id.slice(0,6)}</span>
+              <span class="name">${j.video_filename}</span>
+              <span class="badge ${badgeClass}">${badgeText}</span>
+            </div>`;
+        });
+
+        list.innerHTML = html;
+      } catch(e) {
+        console.error('Queue refresh failed', e);
+      }
+    }
+
+    // View existing job
+    async function viewJob(jobId) {
+      try {
+        const res = await fetch(`${API}/jobs/${jobId}`);
+        const job = await res.json();
+        activeJobId = jobId;
+        showPipeline(jobId);
+
+        for (const [num, layer] of Object.entries(job.layers)) {
+          if (layer.status !== 'pending') {
+            updateLayerStatus(parseInt(num), layer.status);
+          }
+        }
+
+        if (job.status === 'running') {
+          connectSSE(jobId);
+        }
+        if (job.status === 'completed') {
+          loadJobFiles(jobId);
+        }
+
+        refreshQueue();
+      } catch(e) {
+        console.error('Failed to load job', e);
+      }
+    }
+
+    // Files
+    async function loadJobFiles(jobId) {
+      try {
+        const res = await fetch(`${API}/jobs/${jobId}/files`);
+        const data = await res.json();
+        const list = document.getElementById('filesList');
+
+        if (!data.files || Object.keys(data.files).length === 0) {
+          list.innerHTML = '<div class="empty-state">No files yet</div>';
+          return;
+        }
+
+        const icons = {
+          json: '{}', srt: 'T', mp4: '>', mov: '>', wav: '~',
+          fcpxml: '&lt;/&gt;', edl: '#'
+        };
+
+        let html = '';
+        for (const [key, f] of Object.entries(data.files)) {
+          const ext = f.path.split('.').pop();
+          const icon = icons[ext] || '?';
+          const size = (f.size_bytes / 1024).toFixed(1);
+          html += `
+            <a href="${API}${f.download_url}" target="_blank" class="file-row" style="text-decoration:none;color:inherit">
+              <span class="file-icon">${icon}</span>
+              <span class="file-name">${key}</span>
+              <span class="file-size">${size} KB</span>
+            </a>`;
+        }
+        list.innerHTML = html;
+      } catch(e) {
+        console.error('Failed to load files', e);
+      }
+    }
+
+    // Health check
+    async function checkHealth() {
+      try {
+        const res = await fetch(`${API}/health`);
+        if (res.ok) {
+          document.getElementById('serverDot').style.background = '#3fb950';
+          document.getElementById('serverStatus').textContent = 'Connected';
+        }
+      } catch {
+        document.getElementById('serverDot').style.background = '#f85149';
+        document.getElementById('serverStatus').textContent = 'Disconnected';
+      }
+    }
+
+    // Fetch Ollama models
+    async function loadOllamaModels() {
+      const group = document.getElementById('ollamaGroup');
+      try {
+        const res = await fetch(`${API}/ollama-models`);
+        const data = await res.json();
+        if (data.models && data.models.length) {
+          group.innerHTML = data.models.map(m =>
+            `<option value="ollama:${m.name}">Ollama — ${m.name} (${m.size})</option>`
+          ).join('');
+        } else {
+          group.innerHTML = '<option disabled>No Ollama models found</option>';
+        }
+      } catch {
+        group.innerHTML = '<option disabled>Ollama not running</option>';
+      }
+    }
+
+    // Init
+    checkHealth();
+    refreshQueue();
+    updateBtnState();
+    loadOllamaModels();
+    setInterval(checkHealth, 10000);
+    setInterval(refreshQueue, 5000);
+  </script>
+</body>
+</html>

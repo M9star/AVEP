@@ -19,6 +19,12 @@ opentimelineio
 # DaVinci Resolve ships its own Python — no pip install needed
 # ffmpeg must be installed via brew/apt separately
 
+# API Server
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+sse-starlette>=2.0.0
+python-multipart>=0.0.9
+
 # Utilities
 ffmpeg-python
 rich

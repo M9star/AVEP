@@ -85,7 +85,52 @@ data/
         └── final_cut.mp4
 ```
 
-## Quick Start
+## Run the Web App (recommended)
+
+The fastest way to use AVEP — a web UI with drag-drop upload, a job queue,
+live per-layer progress, and downloadable outputs.
+
+```bash
+# Start the server (auto-creates .venv if missing)
+./run.sh
+
+# Custom port
+./run.sh --port 9000
+```
+
+Then open:
+
+| URL                          | What                                   |
+|------------------------------|----------------------------------------|
+| http://localhost:8000        | Web UI — upload, queue, live progress  |
+| http://localhost:8000/docs   | Interactive API docs (Swagger)         |
+| http://localhost:8000/queue  | Current queue state (JSON)             |
+
+**Features**
+- Upload multiple videos — they process one at a time via a FIFO queue
+- Live progress over Server-Sent Events (per-layer status + completion)
+- FPS auto-detected from the video (no manual entry)
+- Browse/download every intermediate + output file (`/data`, `/jobs/{id}/files`)
+
+### API quick reference
+
+```bash
+# Upload + start pipeline
+curl -X POST http://localhost:8000/upload \
+  -F "video=@data/input/myvideo.mp4" \
+  -F "subject=College Physics II"
+
+# Check job status
+curl http://localhost:8000/jobs/<job_id>
+
+# Stream live events
+curl -N http://localhost:8000/jobs/<job_id>/stream
+
+# Download final cut
+curl -O http://localhost:8000/jobs/<job_id>/download
+```
+
+## Quick Start (CLI)
 
 ```bash
 # 1. Activate virtual environment

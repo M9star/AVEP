@@ -6,12 +6,16 @@ Run:  python -m layer3_bridge.bridge
 import json
 import opentimelineio as otio
 from pathlib import Path
-from config.settings import get_paths
+from config.settings import get_paths, detect_fps
 
 
-def run(video_path: str, fps: float = 30.0):
+def run(video_path: str, fps: float | None = None):
     paths = get_paths(video_path)
     paths["inter_dir"].mkdir(parents=True, exist_ok=True)
+
+    if fps is None:
+        fps = detect_fps(video_path)
+        print(f"[L3] Auto-detected FPS: {fps}")
 
     print("\n[L3] Loading edit plan...")
     with open(paths["edit_plan"]) as f:
@@ -37,9 +41,12 @@ def run(video_path: str, fps: float = 30.0):
     otio.adapters.write_to_file(timeline, str(paths["fcpxml_output"]))
     print(f"  [Bridge] FCPXML → {paths['fcpxml_output']}")
 
-    # Export EDL
-    otio.adapters.write_to_file(timeline, str(paths["edl_output"]))
-    print(f"  [Bridge] EDL    → {paths['edl_output']}")
+    # Export EDL (cmx3600 adapter crashes on empty tracks)
+    if len(track) > 0:
+        otio.adapters.write_to_file(timeline, str(paths["edl_output"]))
+        print(f"  [Bridge] EDL    → {paths['edl_output']}")
+    else:
+        print(f"  [Bridge] EDL skipped — no clips in timeline")
 
     print(f"\n[L3] ✓ Done")
 

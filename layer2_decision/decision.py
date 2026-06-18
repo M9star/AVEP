@@ -5,13 +5,32 @@ Run:  python -m layer2_decision.decision --video data/input/myvideo.mp4
 import json
 import argparse
 from config.settings import get_paths
-from layer2_decision.heuristics import flag_filler_words, flag_long_silences
+from layer2_decision.heuristics import flag_filler_words, flag_long_silences, build_edit_plan
 from layer2_decision.agent import call_llm
 from layer2_decision.corrector import correct_transcript
 from layer1_perception.subtitle import generate_srt
 
 
-def run(video_path: str, skip_llm: bool = False, subject_hint: str = ""):
+def run(video_path: str, skip_llm: bool = False, subject_hint: str = "", llm_provider: str | None = None):
+    # Override LLM provider for this run if specified (per-job selection from frontend)
+    if llm_provider:
+        import config.settings
+        import layer2_decision.agent as _agent
+        import layer2_decision.corrector as _corrector
+
+        # "ollama:llama3.1:8b" → provider="ollama", model="llama3.1:8b"
+        if llm_provider.startswith("ollama:"):
+            ollama_model = llm_provider.split(":", 1)[1]
+            _agent.OLLAMA_MODEL = ollama_model
+            _corrector.OLLAMA_MODEL = ollama_model
+            llm_provider = "ollama"
+            print(f"  [L2] Using Ollama model: {ollama_model}")
+
+        config.settings.LLM_PROVIDER = llm_provider
+        _agent.LLM_PROVIDER = llm_provider
+        _corrector.LLM_PROVIDER = llm_provider
+        print(f"  [L2] Using LLM provider: {llm_provider}")
+
     paths = get_paths(video_path)
     paths["inter_dir"].mkdir(parents=True, exist_ok=True)
 
@@ -24,21 +43,19 @@ def run(video_path: str, skip_llm: bool = False, subject_hint: str = ""):
     words = raw_words_data["words"]
     silences = silence_data["silences"]
 
-    # Run heuristics first (free & fast)
     fillers  = flag_filler_words(words)
     long_silences = flag_long_silences(silences)
     print(f"  [Heuristics] Flagged {len(fillers)} filler words, {len(long_silences)} long silences")
 
     if skip_llm:
-        print("  [Agent] Skipping LLM (--skip-llm flag set)")
-        edit_plan = {"keep_segments": [], "remove_segments": [], "flag_zoom": []}
+        print("  [Agent] Skipping LLM — using heuristic edit plan")
+        edit_plan = build_edit_plan(words, silences)
+        print(f"  [Heuristics] Generated {len(edit_plan['keep_segments'])} keep, {len(edit_plan['remove_segments'])} remove segments")
         corrected = {"corrected_words": words, "corrections_summary": [], "total_corrections": 0}
     else:
-        # Step 1 — correct misheard words
         print("[L2] Running transcript correction...")
         corrected = correct_transcript(words, subject_hint)
 
-        # Step 2 — generate edit plan using corrected transcript
         perception = {"words": corrected["corrected_words"], "silences": silences}
         edit_plan = call_llm(perception)
 

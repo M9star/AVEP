@@ -3,10 +3,28 @@ Central configuration for AVEP.
 All thresholds, model names, and paths live here.
 """
 import os
+import json
+import subprocess
 from pathlib import Path
 from dotenv import load_dotenv
 
 load_dotenv()
+
+
+def detect_fps(video_path: str, default: float = 30.0) -> float:
+    """Probe video frame rate via ffprobe. Falls back to default if detection fails."""
+    try:
+        result = subprocess.run(
+            ["ffprobe", "-v", "error", "-select_streams", "v:0",
+             "-show_entries", "stream=r_frame_rate", "-of", "json", str(video_path)],
+            capture_output=True, text=True, check=True,
+        )
+        rate = json.loads(result.stdout)["streams"][0]["r_frame_rate"]  # e.g. "30000/1001"
+        num, den = rate.split("/")
+        fps = float(num) / float(den)
+        return round(fps, 3) if fps > 0 else default
+    except Exception:
+        return default
 
 # ── Paths ────────────────────────────────────────────────────────────────────
 BASE_DIR    = Path(__file__).parent.parent

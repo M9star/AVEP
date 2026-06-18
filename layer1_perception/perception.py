@@ -47,7 +47,11 @@ def _apply_sync_offset(words: list[dict], offset: float) -> list[dict]:
     ]
 
 
-def run(video_path: str, skip_denoise: bool = False):
+def run(video_path: str, skip_denoise: bool = False, progress_cb=None):
+    def report(msg, pct=None):
+        if progress_cb:
+            progress_cb(msg, pct)
+
     video_path = Path(video_path)
     paths = get_paths(str(video_path))
     paths["inter_dir"].mkdir(parents=True, exist_ok=True)
@@ -56,6 +60,7 @@ def run(video_path: str, skip_denoise: bool = False):
     raw_audio = paths["raw_audio"]
     cleaned_audio = paths["clean_audio"]
     print(f"\n[L1] Extracting audio from {video_path.name}...")
+    report("Extracting audio from video...", None)
     subprocess.run(
         ["ffmpeg", "-y", "-i", str(video_path), "-ac", "1", "-ar", "16000", str(raw_audio)],
         check=True, capture_output=True
@@ -65,14 +70,15 @@ def run(video_path: str, skip_denoise: bool = False):
     audio_for_processing = str(raw_audio)
     if not skip_denoise:
         print("[L1] Running noise reduction...")
-        audio_for_processing = denoise(str(raw_audio), str(cleaned_audio))
+        audio_for_processing = denoise(str(raw_audio), str(cleaned_audio), progress_cb=progress_cb)
 
     # Step 3 — transcribe
     print("[L1] Transcribing...")
-    words = transcribe(audio_for_processing)
+    words = transcribe(audio_for_processing, progress_cb=progress_cb)
 
     # Step 4 — VAD silence map + speech onsets
     print("[L1] Detecting silence & speech onsets...")
+    report("Detecting silence & speech onsets...", None)
     silences, speech_onsets = detect_silence(audio_for_processing, return_onsets=True)
 
     # Step 5 — fix timestamp sync drift
