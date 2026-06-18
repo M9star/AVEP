@@ -225,6 +225,54 @@ async def list_jobs():
     ]
 
 
+@app.get("/jobs/{job_id}/results")
+async def get_job_results(job_id: str):
+    """Fetch transcript, corrections, and edit plan for a completed/in-progress job."""
+    job = jobs.get(job_id)
+    if not job:
+        raise HTTPException(404, f"Job {job_id} not found")
+
+    paths = get_paths(job["video_path"])
+    result = {}
+
+    # Raw transcript
+    raw_words_path = Path(paths["raw_words"])
+    if raw_words_path.exists():
+        import json as _json
+        with open(raw_words_path) as f:
+            data = _json.load(f)
+        result["transcript"] = {
+            "word_count": len(data.get("words", [])),
+            "words": data.get("words", []),
+        }
+
+    # Corrected transcript
+    corrected_path = Path(paths["corrected_transcript"])
+    if corrected_path.exists():
+        with open(corrected_path) as f:
+            data = _json.load(f)
+        result["corrections"] = {
+            "total_corrections": data.get("total_corrections", 0),
+            "corrections_summary": data.get("corrections_summary", []),
+            "corrected_words": data.get("corrected_words", []),
+        }
+
+    # Edit plan
+    edit_plan_path = Path(paths["edit_plan"])
+    if edit_plan_path.exists():
+        with open(edit_plan_path) as f:
+            data = _json.load(f)
+        result["edit_plan"] = {
+            "keep_count": len(data.get("keep_segments", [])),
+            "remove_count": len(data.get("remove_segments", [])),
+            "keep_segments": data.get("keep_segments", []),
+            "remove_segments": data.get("remove_segments", []),
+            "flag_zoom": data.get("flag_zoom", []),
+        }
+
+    return result
+
+
 @app.get("/ollama-models")
 async def list_ollama_models():
     """Fetch available models from local Ollama instance."""

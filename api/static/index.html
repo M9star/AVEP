@@ -322,6 +322,146 @@
     .log-entry.error { color: #f85149; }
     .log-entry .ts { color: #484f58; margin-right: 0.5rem; }
 
+    /* Step toggles */
+    .step-toggles {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+      margin-top: 1rem;
+      margin-bottom: 0.5rem;
+    }
+    .step-toggles .label-row {
+      font-size: 0.75rem;
+      color: #484f58;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 2px;
+    }
+    .step-toggle {
+      display: flex;
+      align-items: center;
+      padding: 8px 12px;
+      border-radius: 6px;
+      border: 1px solid #21262d;
+      background: #0d1117;
+      cursor: pointer;
+      transition: all 0.15s;
+      user-select: none;
+    }
+    .step-toggle:hover { border-color: #30363d; }
+    .step-toggle.on { border-color: #238636; background: rgba(35,134,54,0.1); }
+    .step-toggle.off { border-color: #f85149; background: rgba(248,81,73,0.06); opacity: 0.6; }
+    .step-toggle .step-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      margin-right: 10px;
+      flex-shrink: 0;
+    }
+    .step-toggle.on .step-dot { background: #3fb950; }
+    .step-toggle.off .step-dot { background: #484f58; }
+    .step-toggle .step-label { font-size: 0.82rem; flex: 1; }
+    .step-toggle .step-tag {
+      font-size: 0.7rem;
+      padding: 2px 8px;
+      border-radius: 8px;
+    }
+    .step-toggle.on .step-tag { background: rgba(63,185,80,0.15); color: #3fb950; }
+    .step-toggle.off .step-tag { background: rgba(139,148,158,0.15); color: #8b949e; }
+
+    /* Result sections */
+    .result-stats {
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 0.8rem;
+      flex-wrap: wrap;
+    }
+    .stat-badge {
+      background: #0d1117;
+      border: 1px solid #21262d;
+      border-radius: 6px;
+      padding: 6px 12px;
+      font-size: 0.8rem;
+    }
+    .stat-badge .stat-num {
+      font-weight: 700;
+      color: #58a6ff;
+      margin-right: 4px;
+    }
+    .transcript-area {
+      background: #0d1117;
+      border: 1px solid #21262d;
+      border-radius: 6px;
+      padding: 1rem;
+      max-height: 250px;
+      overflow-y: auto;
+      font-size: 0.85rem;
+      line-height: 1.8;
+    }
+    .transcript-area .word { display: inline; }
+    .transcript-area .word-filler {
+      color: #f85149;
+      text-decoration: line-through;
+      opacity: 0.7;
+    }
+    .transcript-area .word-corrected {
+      color: #3fb950;
+      border-bottom: 1px dotted #3fb950;
+      cursor: help;
+    }
+    .corrections-list {
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    .correction-row {
+      display: flex;
+      align-items: center;
+      padding: 0.5rem 0.7rem;
+      border-radius: 4px;
+      font-size: 0.83rem;
+      margin-bottom: 0.3rem;
+      background: #0d1117;
+      border: 1px solid #21262d;
+    }
+    .correction-row .original {
+      color: #f85149;
+      text-decoration: line-through;
+      min-width: 120px;
+    }
+    .correction-row .arrow { color: #484f58; margin: 0 0.6rem; }
+    .correction-row .corrected { color: #3fb950; min-width: 120px; }
+    .correction-row .reason { color: #8b949e; flex: 1; text-align: right; font-size: 0.75rem; }
+    .correction-row .count {
+      background: rgba(88,166,255,0.15);
+      color: #58a6ff;
+      font-size: 0.7rem;
+      padding: 1px 6px;
+      border-radius: 8px;
+      margin-left: 8px;
+    }
+    .edit-plan-area {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.8rem;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    .plan-section h3 {
+      font-size: 0.8rem;
+      margin-bottom: 0.5rem;
+      color: #8b949e;
+    }
+    .plan-seg {
+      font-size: 0.78rem;
+      padding: 4px 8px;
+      border-radius: 4px;
+      margin-bottom: 3px;
+      background: #0d1117;
+    }
+    .plan-seg.keep { border-left: 3px solid #3fb950; }
+    .plan-seg.remove { border-left: 3px solid #f85149; }
+    .plan-seg .seg-time { color: #58a6ff; }
+    .plan-seg .seg-reason { color: #8b949e; margin-left: 6px; }
+
     /* Responsive */
     @media (max-width: 768px) {
       .container { grid-template-columns: 1fr; padding: 1rem; }
@@ -385,13 +525,44 @@
             </optgroup>
           </select>
         </label>
-        <label class="checkbox-row">
-          <input type="checkbox" id="optSkipDenoise"> Skip denoise
-        </label>
-        <label class="checkbox-row">
-          <input type="checkbox" id="optSkipLlm"> Skip LLM
-        </label>
       </div>
+
+      <div class="step-toggles">
+        <div class="label-row">Pipeline Steps</div>
+        <div class="step-toggle on" id="stepDenoise" onclick="toggleStep(this)">
+          <span class="step-dot"></span>
+          <span class="step-label">Denoise Audio (DeepFilterNet)</span>
+          <span class="step-tag">ON</span>
+        </div>
+        <div class="step-toggle on" id="stepTranscribe" style="opacity:0.5;pointer-events:none">
+          <span class="step-dot"></span>
+          <span class="step-label">Transcribe (Whisper)</span>
+          <span class="step-tag">ALWAYS</span>
+        </div>
+        <div class="step-toggle on" id="stepCorrect" onclick="toggleStep(this)">
+          <span class="step-dot"></span>
+          <span class="step-label">Correct Transcript (LLM)</span>
+          <span class="step-tag">ON</span>
+        </div>
+        <div class="step-toggle on" id="stepEditPlan" onclick="toggleStep(this)">
+          <span class="step-dot"></span>
+          <span class="step-label">Edit Planning (LLM)</span>
+          <span class="step-tag">ON</span>
+        </div>
+        <div class="step-toggle on" id="stepTimeline" style="opacity:0.5;pointer-events:none">
+          <span class="step-dot"></span>
+          <span class="step-label">Timeline Export (FCPXML/EDL)</span>
+          <span class="step-tag">ALWAYS</span>
+        </div>
+        <div class="step-toggle on" id="stepRender" style="opacity:0.5;pointer-events:none">
+          <span class="step-dot"></span>
+          <span class="step-label">Render Final Cut (FFmpeg)</span>
+          <span class="step-tag">ALWAYS</span>
+        </div>
+      </div>
+
+      <input type="checkbox" id="optSkipDenoise" hidden>
+      <input type="checkbox" id="optSkipLlm" hidden>
 
       <button class="btn" id="uploadBtn" disabled>Upload & Process</button>
     </div>
@@ -411,6 +582,27 @@
         Pipeline Progress — <span id="pipelineJobId"></span>
       </h2>
       <div id="layerProgress"></div>
+    </div>
+
+    <!-- Transcript -->
+    <div class="card full-width pipeline-card" id="transcriptCard" style="display:none">
+      <h2><span class="icon">T</span> Transcript</h2>
+      <div class="result-stats" id="transcriptStats"></div>
+      <div class="transcript-area" id="transcriptArea"></div>
+    </div>
+
+    <!-- Corrections -->
+    <div class="card full-width pipeline-card" id="correctionsCard" style="display:none">
+      <h2><span class="icon">*</span> Corrections</h2>
+      <div class="result-stats" id="correctionStats"></div>
+      <div class="corrections-list" id="correctionsList"></div>
+    </div>
+
+    <!-- Edit Plan -->
+    <div class="card full-width pipeline-card" id="editPlanCard" style="display:none">
+      <h2><span class="icon">//</span> Edit Plan</h2>
+      <div class="result-stats" id="editPlanStats"></div>
+      <div class="edit-plan-area" id="editPlanArea"></div>
     </div>
 
     <!-- Output Files -->
@@ -435,6 +627,20 @@
     let mode = 'upload';           // 'upload' | 'server'
     let activeJobId = null;
     let eventSource = null;
+
+    // Step toggles
+    function toggleStep(el) {
+      const isOn = el.classList.contains('on');
+      el.classList.toggle('on', !isOn);
+      el.classList.toggle('off', isOn);
+      el.querySelector('.step-tag').textContent = isOn ? 'OFF' : 'ON';
+
+      // Sync to hidden checkboxes for form submission
+      document.getElementById('optSkipDenoise').checked = document.getElementById('stepDenoise').classList.contains('off');
+      const llmOff = document.getElementById('stepCorrect').classList.contains('off')
+                  && document.getElementById('stepEditPlan').classList.contains('off');
+      document.getElementById('optSkipLlm').checked = llmOff;
+    }
 
     // Tab switching
     function switchTab(which) {
@@ -591,6 +797,7 @@
         const d = JSON.parse(e.data);
         addLog(`Layer ${d.layer} completed: ${d.name}`, 'success');
         updateLayerStatus(d.layer, 'completed');
+        loadResults(jobId);
       });
 
       eventSource.addEventListener('layer_failed', e => {
@@ -646,6 +853,9 @@
 
       document.getElementById('logArea').innerHTML = '';
       document.getElementById('filesList').innerHTML = '<div class="empty-state">Files appear after processing</div>';
+      document.getElementById('transcriptCard').style.display = 'none';
+      document.getElementById('correctionsCard').style.display = 'none';
+      document.getElementById('editPlanCard').style.display = 'none';
     }
 
     function updateLayerStatus(num, status) {
@@ -748,7 +958,8 @@
         if (job.status === 'running') {
           connectSSE(jobId);
         }
-        if (job.status === 'completed') {
+        if (job.status === 'completed' || job.status === 'failed') {
+          loadResults(jobId);
           loadJobFiles(jobId);
         }
 
@@ -756,6 +967,105 @@
       } catch(e) {
         console.error('Failed to load job', e);
       }
+    }
+
+    // Results (transcript, corrections, edit plan)
+    const FILLER_WORDS = new Set(['um', 'uh', 'like', 'you know', 'basically', 'literally']);
+
+    async function loadResults(jobId) {
+      try {
+        const res = await fetch(`${API}/jobs/${jobId}/results`);
+        const data = await res.json();
+
+        // Transcript
+        if (data.transcript) {
+          const card = document.getElementById('transcriptCard');
+          card.style.display = 'block';
+          const words = data.transcript.words;
+          document.getElementById('transcriptStats').innerHTML = `
+            <span class="stat-badge"><span class="stat-num">${words.length}</span>words</span>
+            <span class="stat-badge"><span class="stat-num">${(words.length > 0 ? (words[words.length-1].end / 60).toFixed(1) : 0)}</span>min</span>
+          `;
+
+          // Use corrected words if available, otherwise raw
+          const displayWords = data.corrections ? data.corrections.corrected_words : words;
+          const correctedSet = new Set();
+          if (data.corrections) {
+            data.corrections.corrected_words.forEach((w, i) => {
+              if (w.corrected) correctedSet.add(i);
+            });
+          }
+
+          document.getElementById('transcriptArea').innerHTML = displayWords.map((w, i) => {
+            const word = w.word || '';
+            const isFiller = FILLER_WORDS.has(word.toLowerCase().replace(/[.,!?]/g, ''));
+            const isCorrected = correctedSet.has(i);
+            let cls = 'word';
+            let title = '';
+            if (isCorrected) { cls = 'word word-corrected'; title = `title="was: ${w.original}"`; }
+            else if (isFiller) { cls = 'word word-filler'; }
+            return `<span class="${cls}" ${title}>${word} </span>`;
+          }).join('');
+        }
+
+        // Corrections
+        if (data.corrections && data.corrections.corrections_summary.length > 0) {
+          const card = document.getElementById('correctionsCard');
+          card.style.display = 'block';
+          const c = data.corrections;
+          document.getElementById('correctionStats').innerHTML = `
+            <span class="stat-badge"><span class="stat-num">${c.total_corrections}</span>words fixed</span>
+            <span class="stat-badge"><span class="stat-num">${c.corrections_summary.length}</span>unique corrections</span>
+          `;
+          document.getElementById('correctionsList').innerHTML = c.corrections_summary.map(s => `
+            <div class="correction-row">
+              <span class="original">${s.original}</span>
+              <span class="arrow">-></span>
+              <span class="corrected">${s.corrected_to}</span>
+              <span class="reason">${s.reason || ''}</span>
+              <span class="count">x${s.count || 1}</span>
+            </div>
+          `).join('');
+        }
+
+        // Edit plan
+        if (data.edit_plan) {
+          const card = document.getElementById('editPlanCard');
+          card.style.display = 'block';
+          const p = data.edit_plan;
+
+          const keepTime = p.keep_segments.reduce((t, s) => t + (s.end - s.start), 0);
+          const removeTime = p.remove_segments.reduce((t, s) => t + (s.end - s.start), 0);
+
+          document.getElementById('editPlanStats').innerHTML = `
+            <span class="stat-badge"><span class="stat-num">${p.keep_count}</span>keep segments (${keepTime.toFixed(0)}s)</span>
+            <span class="stat-badge"><span class="stat-num">${p.remove_count}</span>removed (${removeTime.toFixed(0)}s)</span>
+            <span class="stat-badge"><span class="stat-num">${p.flag_zoom.length}</span>zoom flags</span>
+          `;
+
+          const fmtTime = s => `${Math.floor(s/60)}:${(s%60).toFixed(1).padStart(4,'0')}`;
+          document.getElementById('editPlanArea').innerHTML = `
+            <div class="plan-section">
+              <h3>Keep</h3>
+              ${p.keep_segments.slice(0, 30).map(s => `
+                <div class="plan-seg keep">
+                  <span class="seg-time">${fmtTime(s.start)} - ${fmtTime(s.end)}</span>
+                  <span class="seg-reason">${s.reason}</span>
+                </div>`).join('')}
+              ${p.keep_count > 30 ? `<div class="plan-seg keep">... +${p.keep_count - 30} more</div>` : ''}
+            </div>
+            <div class="plan-section">
+              <h3>Remove</h3>
+              ${p.remove_segments.slice(0, 30).map(s => `
+                <div class="plan-seg remove">
+                  <span class="seg-time">${fmtTime(s.start)} - ${fmtTime(s.end)}</span>
+                  <span class="seg-reason">${s.reason}</span>
+                </div>`).join('')}
+              ${p.remove_count > 30 ? `<div class="plan-seg remove">... +${p.remove_count - 30} more</div>` : ''}
+            </div>
+          `;
+        }
+      } catch(e) { console.error('loadResults', e); }
     }
 
     // Files
