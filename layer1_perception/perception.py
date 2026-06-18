@@ -8,7 +8,8 @@ from pathlib import Path
 from layer1_perception.transcribe import transcribe
 from layer1_perception.vad import detect_silence
 from layer1_perception.denoise import denoise
-from config.settings import PERCEPTION_OUTPUT, INTER_DIR
+from layer1_perception.subtitle import generate_srt
+from config.settings import PERCEPTION_OUTPUT, PREVIEW_SRT, INTER_DIR
 
 
 def run(video_path: str, skip_denoise: bool = False):
@@ -39,7 +40,11 @@ def run(video_path: str, skip_denoise: bool = False):
     print("[L1] Detecting silence...")
     silences = detect_silence(audio_for_processing)
 
-    # Step 5 — write output
+    # Step 5 — generate SRT for preview
+    print("[L1] Generating subtitle preview...")
+    generate_srt(words, str(PREVIEW_SRT))
+
+    # Step 6 — write output
     output = {
         "source_video": str(video_path),
         "audio_used": audio_for_processing,

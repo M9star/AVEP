@@ -16,6 +16,7 @@ INTER_DIR   = DATA_DIR / "intermediate"
 OUTPUT_DIR  = DATA_DIR / "output"
 
 PERCEPTION_OUTPUT = INTER_DIR / "perception_output.json"
+PREVIEW_SRT       = INTER_DIR / "preview.srt"
 EDIT_PLAN         = INTER_DIR / "edit_plan.json"
 FCPXML_OUTPUT     = INTER_DIR / "timeline.fcpxml"
 EDL_OUTPUT        = INTER_DIR / "timeline.edl"
