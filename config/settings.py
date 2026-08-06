@@ -75,6 +75,7 @@ DATA_DIR    = BASE_DIR / "data"
 INPUT_DIR   = DATA_DIR / "input"
 INTER_DIR   = DATA_DIR / "intermediate"
 OUTPUT_DIR  = DATA_DIR / "output"
+AGENT_DB    = DATA_DIR / "agent_runs.sqlite3"
 
 PERCEPTION_OUTPUT = INTER_DIR / "perception_output.json"
 PREVIEW_SRT       = INTER_DIR / "preview.srt"
@@ -104,6 +105,7 @@ def get_paths(video_path: str) -> dict:
         "fcpxml_output":         inter / "timeline.fcpxml",
         "edl_output":            inter / "timeline.edl",
         "otio_output":           inter / "timeline.otio",
+        "quality_report":        inter / "quality_report.json",
         "final_output":          out   / "final_cut.mp4",
     }
 

@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1120" viewBox="0 0 1800 1120" role="img" aria-labelledby="title desc">
   <title id="title">AVEP autonomous video editing pipeline architecture</title>
-  <desc id="desc">Repository architecture showing interfaces, queue, four processing layers, validated data contracts, NLE exports, FFmpeg rendering, storage, and planned capabilities.</desc>
+  <desc id="desc">Hybrid agent architecture showing interfaces, persistent orchestration, deterministic media tools, edit decisions, quality control, revision loops, timeline exports, rendering, and artifact storage.</desc>
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#07111f"/>
@@ -43,9 +43,9 @@
   <!-- Header -->
   <g transform="translate(58 42)">
     <rect x="0" y="0" width="10" height="82" rx="5" fill="url(#header)"/>
-    <text x="34" y="20" class="eyebrow">AVEP · REPOSITORY ARCHITECTURE · IMPLEMENTED v1.1</text>
+    <text x="34" y="20" class="eyebrow">AVEP · HYBRID AGENT ARCHITECTURE · IMPLEMENTED v1.2</text>
     <text x="34" y="60" class="title">Autonomous Video Editing Pipeline</text>
-    <text x="34" y="88" class="subtitle">Raw footage → perception → validated decisions → NLE timelines + verified final render</text>
+    <text x="34" y="88" class="subtitle">User goal → persistent orchestrator → deterministic tools → quality approval or bounded revision</text>
   </g>
   <g transform="translate(1450 48)">
     <rect width="286" height="68" rx="14" fill="#0f1d31" stroke="#334155"/>
@@ -76,18 +76,18 @@
     <rect x="810" y="184" width="315" height="104" rx="16" fill="#172033" stroke="#a78bfa" stroke-width="2"/>
     <rect x="830" y="202" width="78" height="23" rx="11" fill="#6d28d9"/>
     <text x="844" y="218" class="chip" fill="#ede9fe">FIFO</text>
-    <text x="830" y="253" class="cardTitle">Job Queue</text>
-    <text x="830" y="276" class="mono">api/pipeline_runner.py</text>
+    <text x="830" y="253" class="cardTitle">Agent Orchestrator</text>
+    <text x="830" y="276" class="mono">agents/orchestrator.py</text>
 
     <rect x="1210" y="192" width="250" height="88" rx="14" fill="#132238" stroke="#4ecdc4"/>
-    <text x="1234" y="226" class="cardSub">Per-video workspace</text>
-    <text x="1234" y="250" class="mono">data/intermediate/&lt;video&gt;</text>
-    <text x="1234" y="269" class="small">Isolated artifacts and results</text>
+    <text x="1234" y="226" class="cardSub">Persistent agent state</text>
+    <text x="1234" y="250" class="mono">data/agent_runs.sqlite3</text>
+    <text x="1234" y="269" class="small">Goal · step · attempt · artifacts</text>
 
     <rect x="1485" y="192" width="250" height="88" rx="14" fill="#132238" stroke="#4ecdc4"/>
-    <text x="1509" y="226" class="cardSub">Central configuration</text>
-    <text x="1509" y="250" class="mono">config/settings.py</text>
-    <text x="1509" y="269" class="small">Paths · models · ffprobe</text>
+    <text x="1509" y="226" class="cardSub">Events + resume</text>
+    <text x="1509" y="250" class="mono">agents/state_store.py</text>
+    <text x="1509" y="269" class="small">Auditable decisions and recovery</text>
   </g>
   <path d="M 265 236 H 290" class="arrow"/>
   <path d="M 495 236 H 810" class="arrow"/>
@@ -188,9 +188,9 @@
     <text x="1412" y="727" class="body">VideoToolbox / NVENC</text>
     <text x="1412" y="751" class="body">↳ runtime fallback to libx264</text>
     <text x="1412" y="775" class="body">Temporary output → ffprobe → publish</text>
-    <rect x="1510" y="789" width="206" height="36" rx="10" fill="#581c87" stroke="#d8b4fe"/>
-    <text x="1530" y="812" class="mono">final_cut.mp4 ✓</text>
   </g>
+
+  <path d="M 1565 816 V 852" class="arrowHot"/>
 
   <!-- Storage and contracts -->
   <text x="60" y="756" class="section">04 · PER-VIDEO ARTIFACT STORE</text>
@@ -209,26 +209,31 @@
     <text x="376" y="892" class="mono">raw_audio.wav · raw_words.json · corrected.srt</text>
     <text x="376" y="919" class="mono">silence_noise_map.json · edit_plan.json</text>
     <text x="376" y="946" class="mono">timeline.fcpxml · timeline.edl · timeline.otio</text>
+    <text x="376" y="971" class="mono">quality_report.json · per-attempt reports</text>
 
     <rect x="918" y="834" width="403" height="150" rx="13" fill="#0b1525" stroke="#334155"/>
     <text x="938" y="862" class="cardSub">output/&lt;video&gt;/</text>
     <text x="938" y="892" class="mono">final_cut.mp4</text>
     <text x="938" y="921" class="small">Atomic publish after validation</text>
-    <text x="938" y="946" class="small">Download through job API</text>
+    <text x="938" y="946" class="small">Published only after quality approval</text>
   </g>
   <path d="M 255 700 V 776" class="dash"/>
   <path d="M 855 700 V 736 H 640 V 776" class="dash"/>
-  <path d="M 1510 816 V 1038 H 1120 V 984" class="dash"/>
+  <path d="M 1510 1016 V 1038 H 1120 V 984" class="dash"/>
 
-  <!-- Roadmap -->
+  <!-- Quality-control agent -->
   <g>
-    <rect x="1390" y="852" width="350" height="164" rx="18" fill="#171d2b" stroke="#64748b" stroke-dasharray="7 6"/>
-    <text x="1412" y="883" class="section">PLANNED / NEXT</text>
-    <text x="1412" y="915" class="body">○ Deterministic repeated-take detection</text>
-    <text x="1412" y="943" class="body">○ Apply zoom flags during rendering</text>
-    <text x="1412" y="971" class="body">○ Persistent jobs + cancellation</text>
-    <text x="1412" y="999" class="body">○ Optional Resolve automation</text>
+    <rect x="1390" y="852" width="350" height="164" rx="18" fill="#102a27" stroke="#34d399" stroke-width="2"/>
+    <rect x="1412" y="870" width="122" height="25" rx="12" fill="#065f46"/>
+    <text x="1426" y="887" class="chip" fill="#d1fae5">QUALITY AGENT</text>
+    <text x="1412" y="924" class="cardTitle">Approve or Revise</text>
+    <text x="1412" y="949" class="body">Duration · audio · output · cut checks</text>
+    <text x="1412" y="973" class="small">Reject → revise plan or rerender (max 1–5)</text>
+    <rect x="1510" y="984" width="206" height="34" rx="10" fill="#065f46" stroke="#6ee7b7"/>
+    <text x="1530" y="1006" class="mono">final_cut.mp4 ✓</text>
   </g>
+  <path d="M 1390 934 H 1365 V 730 H 1230 V 630" class="dash"/>
+  <text x="1244" y="720" class="chip" fill="#94a3b8">REVISE / RERENDER</text>
 
   <!-- Footer -->
   <line x1="60" y1="1055" x2="1740" y2="1055" stroke="#334155"/>
@@ -238,7 +243,7 @@
     <circle cx="130" cy="8" r="6" fill="#f59e0b"/>
     <text x="146" y="13" class="small">Optional/provider-dependent</text>
     <circle cx="358" cy="8" r="6" fill="#64748b"/>
-    <text x="374" y="13" class="small">Planned</text>
+    <text x="374" y="13" class="small">Legacy one-pass mode available</text>
   </g>
   <text x="1740" y="1088" class="small" text-anchor="end">Source: AVEP repository · documents/avep_architecture.html</text>
 </svg>

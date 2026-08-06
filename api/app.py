@@ -17,7 +17,8 @@ from sse_starlette.sse import EventSourceResponse
 
 from fastapi.staticfiles import StaticFiles
 
-from config.settings import INPUT_DIR, DATA_DIR, INTER_DIR, OUTPUT_DIR, get_paths
+from config.settings import AGENT_DB, INPUT_DIR, DATA_DIR, INTER_DIR, OUTPUT_DIR, get_paths
+from agents.state_store import AgentStateStore
 from api.models import (
     PipelineStatus,
     JobResponse,
@@ -33,6 +34,7 @@ app = FastAPI(title="AVEP — Autonomous Video Editing Pipeline", version="1.0.0
 jobs: dict[str, dict] = {}
 # SSE event queues per job: {job_id: [asyncio.Queue, ...]}
 event_queues: dict[str, list[asyncio.Queue]] = {}
+agent_state_store = AgentStateStore(AGENT_DB)
 
 
 @app.on_event("startup")
@@ -46,7 +48,10 @@ ALLOWED_EXT = {".mp4", ".mov", ".mkv", ".avi", ".webm"}
 async def _enqueue_job(video_path: str, display_name: str,
                        skip_denoise: bool, skip_llm: bool,
                        subject: str, fps: float | None,
-                       llm_provider: str | None = None) -> UploadResponse:
+                       llm_provider: str | None = None,
+                       agent_mode: bool = False,
+                       editing_goal: str = "Create a concise, natural rough cut.",
+                       max_attempts: int = 3) -> UploadResponse:
     """Register a job for an on-disk video and add it to the queue."""
     job_id = uuid.uuid4().hex[:12]
     job = {
@@ -61,6 +66,10 @@ async def _enqueue_job(video_path: str, display_name: str,
         "subject": subject,
         "fps": fps,
         "llm_provider": llm_provider,
+        "agent_mode": agent_mode,
+        "editing_goal": editing_goal,
+        "max_attempts": max_attempts,
+        "agent_run_id": None,
         "result": None,
         "error": None,
     }
@@ -87,6 +96,9 @@ async def upload_video(
     subject: str = Form(""),
     fps: float | None = Form(None),
     llm_provider: str | None = Form(None),
+    agent_mode: bool = Form(False),
+    editing_goal: str = Form("Create a concise, natural rough cut."),
+    max_attempts: int = Form(3),
 ):
     if not video.filename:
         raise HTTPException(400, "No filename provided")
@@ -95,6 +107,8 @@ async def upload_video(
     ext = Path(original_name).suffix.lower()
     if ext not in ALLOWED_EXT:
         raise HTTPException(400, f"Unsupported format: {ext}. Allowed: {ALLOWED_EXT}")
+    if not 1 <= max_attempts <= 5:
+        raise HTTPException(400, "max_attempts must be between 1 and 5")
 
     INPUT_DIR.mkdir(parents=True, exist_ok=True)
     save_name = f"{uuid.uuid4().hex[:8]}_{original_name}"
@@ -106,7 +120,8 @@ async def upload_video(
     await asyncio.to_thread(_write)
 
     return await _enqueue_job(str(save_path), original_name,
-                              skip_denoise, skip_llm, subject, fps, llm_provider)
+                              skip_denoise, skip_llm, subject, fps, llm_provider,
+                              agent_mode, editing_goal, max_attempts)
 
 
 @app.get("/input-files")
@@ -132,6 +147,9 @@ async def process_existing(
     subject: str = Form(""),
     fps: float | None = Form(None),
     llm_provider: str | None = Form(None),
+    agent_mode: bool = Form(False),
+    editing_goal: str = Form("Create a concise, natural rough cut."),
+    max_attempts: int = Form(3),
 ):
     """Queue a video that already lives in data/input/ — no upload needed."""
     safe_name = Path(filename).name
@@ -142,9 +160,12 @@ async def process_existing(
         raise HTTPException(404, f"File not found in data/input: {safe_name}")
     if video_path.suffix.lower() not in ALLOWED_EXT:
         raise HTTPException(400, f"Unsupported format: {video_path.suffix}")
+    if not 1 <= max_attempts <= 5:
+        raise HTTPException(400, "max_attempts must be between 1 and 5")
 
     return await _enqueue_job(str(video_path), safe_name,
-                              skip_denoise, skip_llm, subject, fps, llm_provider)
+                              skip_denoise, skip_llm, subject, fps, llm_provider,
+                              agent_mode, editing_goal, max_attempts)
 
 
 @app.get("/jobs/{job_id}", response_model=JobResponse)
@@ -161,6 +182,8 @@ async def get_job_status(job_id: str):
         queue_position=job_queue.queue_position(job_id),
         result=job.get("result"),
         error=job.get("error"),
+        agent_mode=job.get("agent_mode", False),
+        agent_run_id=job.get("agent_run_id"),
     )
 
 
@@ -221,14 +244,25 @@ async def list_jobs():
             "status": j["status"],
             "video_filename": j["video_filename"],
             "created_at": j["created_at"].isoformat(),
+            "agent_mode": j.get("agent_mode", False),
+            "agent_run_id": j.get("agent_run_id"),
         }
         for j in jobs.values()
     ]
 
 
+@app.get("/agent-runs/{run_id}")
+async def get_agent_run(run_id: str):
+    """Return persisted orchestrator state and its complete decision/event history."""
+    run = agent_state_store.get_run(run_id)
+    if run is None:
+        raise HTTPException(404, f"Agent run {run_id} not found")
+    return run
+
+
 @app.get("/jobs/{job_id}/results")
 async def get_job_results(job_id: str):
-    """Fetch transcript, corrections, and edit plan for a completed/in-progress job."""
+    """Fetch transcript, corrections, edit plan, and agent quality report."""
     job = jobs.get(job_id)
     if not job:
         raise HTTPException(404, f"Job {job_id} not found")
@@ -239,9 +273,8 @@ async def get_job_results(job_id: str):
     # Raw transcript
     raw_words_path = Path(paths["raw_words"])
     if raw_words_path.exists():
-        import json as _json
         with open(raw_words_path) as f:
-            data = _json.load(f)
+            data = json.load(f)
         result["transcript"] = {
             "word_count": len(data.get("words", [])),
             "words": data.get("words", []),
@@ -251,7 +284,7 @@ async def get_job_results(job_id: str):
     corrected_path = Path(paths["corrected_transcript"])
     if corrected_path.exists():
         with open(corrected_path) as f:
-            data = _json.load(f)
+            data = json.load(f)
         result["corrections"] = {
             "total_corrections": data.get("total_corrections", 0),
             "corrections_summary": data.get("corrections_summary", []),
@@ -262,7 +295,7 @@ async def get_job_results(job_id: str):
     edit_plan_path = Path(paths["edit_plan"])
     if edit_plan_path.exists():
         with open(edit_plan_path) as f:
-            data = _json.load(f)
+            data = json.load(f)
         result["edit_plan"] = {
             "keep_count": len(data.get("keep_segments", [])),
             "remove_count": len(data.get("remove_segments", [])),
@@ -270,6 +303,12 @@ async def get_job_results(job_id: str):
             "remove_segments": data.get("remove_segments", []),
             "flag_zoom": data.get("flag_zoom", []),
         }
+
+    # Latest agent quality-control decision (agent mode only)
+    quality_report_path = Path(paths["quality_report"])
+    if quality_report_path.exists():
+        with open(quality_report_path) as f:
+            result["quality_report"] = json.load(f)
 
     return result
 

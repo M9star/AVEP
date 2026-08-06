@@ -16,11 +16,13 @@ def call_llm(
     perception_data: dict,
     provider: str | None = None,
     ollama_model: str | None = None,
+    editing_goal: str = "",
 ) -> dict:
     system_prompt = PROMPT_PATH.read_text()
     user_content   = json.dumps({
         "words":    perception_data["words"],
         "silences": perception_data["silences"],
+        "editing_goal": editing_goal,
     }, indent=2)
 
     provider = provider or LLM_PROVIDER

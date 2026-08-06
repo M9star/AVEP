@@ -34,6 +34,8 @@ class JobResponse(BaseModel):
     queue_position: int | None = None
     result: dict | None = None
     error: str | None = None
+    agent_mode: bool = False
+    agent_run_id: str | None = None
 
 
 class UploadResponse(BaseModel):

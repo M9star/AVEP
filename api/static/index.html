@@ -512,6 +512,10 @@
           <input type="text" id="optSubject" placeholder="e.g. College Physics II">
         </label>
         <label>
+          Editing goal
+          <input type="text" id="optEditingGoal" value="Create a concise, natural rough cut." placeholder="e.g. Preserve technical explanations and use fewer cuts">
+        </label>
+        <label>
           LLM Provider
           <select id="optLlmProvider">
             <option value="">Server default</option>
@@ -525,10 +529,19 @@
             </optgroup>
           </select>
         </label>
+        <label>
+          Maximum agent attempts
+          <input type="number" id="optMaxAttempts" value="3" min="1" max="5">
+        </label>
       </div>
 
       <div class="step-toggles">
         <div class="label-row">Pipeline Steps</div>
+        <div class="step-toggle on" id="stepAgent" onclick="toggleStep(this)">
+          <span class="step-dot"></span>
+          <span class="step-label">Agent Orchestrator + Quality Revision Loop</span>
+          <span class="step-tag">ON</span>
+        </div>
         <div class="step-toggle on" id="stepDenoise" onclick="toggleStep(this)">
           <span class="step-dot"></span>
           <span class="step-label">Denoise Audio (DeepFilterNet)</span>
@@ -563,6 +576,7 @@
 
       <input type="checkbox" id="optSkipDenoise" hidden>
       <input type="checkbox" id="optSkipLlm" hidden>
+      <input type="checkbox" id="optAgentMode" checked hidden>
 
       <button class="btn" id="uploadBtn" disabled>Upload & Process</button>
     </div>
@@ -605,6 +619,13 @@
       <div class="edit-plan-area" id="editPlanArea"></div>
     </div>
 
+    <!-- Agent Quality Review -->
+    <div class="card full-width pipeline-card" id="qualityCard" style="display:none">
+      <h2><span class="icon">Q</span> Agent Quality Review</h2>
+      <div class="result-stats" id="qualityStats"></div>
+      <div class="corrections-list" id="qualityIssues"></div>
+    </div>
+
     <!-- Output Files -->
     <div class="card pipeline-card" id="filesCard">
       <h2><span class="icon">F</span> Output Files</h2>
@@ -637,6 +658,7 @@
 
       // Sync to hidden checkboxes for form submission
       document.getElementById('optSkipDenoise').checked = document.getElementById('stepDenoise').classList.contains('off');
+      document.getElementById('optAgentMode').checked = document.getElementById('stepAgent').classList.contains('on');
       const llmOff = document.getElementById('stepCorrect').classList.contains('off')
                   && document.getElementById('stepEditPlan').classList.contains('off');
       document.getElementById('optSkipLlm').checked = llmOff;
@@ -735,6 +757,9 @@
       form.append('subject', document.getElementById('optSubject').value);
       form.append('skip_denoise', document.getElementById('optSkipDenoise').checked);
       form.append('skip_llm', document.getElementById('optSkipLlm').checked);
+      form.append('agent_mode', document.getElementById('optAgentMode').checked);
+      form.append('editing_goal', document.getElementById('optEditingGoal').value);
+      form.append('max_attempts', document.getElementById('optMaxAttempts').value);
       const llmProvider = document.getElementById('optLlmProvider').value;
       if (llmProvider) form.append('llm_provider', llmProvider);
 
@@ -779,6 +804,27 @@
       eventSource.addEventListener('pipeline_started', e => {
         addLog('Pipeline started', 'info');
         refreshQueue();
+      });
+
+      eventSource.addEventListener('agent_started', e => {
+        const d = JSON.parse(e.data);
+        addLog(`Agent orchestrator started — goal: ${d.goal}`, 'info');
+      });
+
+      eventSource.addEventListener('agent_attempt_started', e => {
+        const d = JSON.parse(e.data);
+        addLog(`Agent attempt ${d.attempt} started`, 'info');
+      });
+
+      eventSource.addEventListener('agent_quality_reviewed', e => {
+        const d = JSON.parse(e.data);
+        if (d.approved) addLog(`Quality agent approved attempt ${d.attempt}`, 'success');
+        else addLog(`Quality agent rejected attempt ${d.attempt}: ${d.issues.map(x => x.code).join(', ')}`, 'error');
+      });
+
+      eventSource.addEventListener('agent_revision_planned', e => {
+        const d = JSON.parse(e.data);
+        addLog(`Orchestrator planned ${d.actions.join(', ')} → attempt ${d.next_attempt}`, 'info');
       });
 
       eventSource.addEventListener('layer_started', e => {
@@ -856,6 +902,7 @@
       document.getElementById('transcriptCard').style.display = 'none';
       document.getElementById('correctionsCard').style.display = 'none';
       document.getElementById('editPlanCard').style.display = 'none';
+      document.getElementById('qualityCard').style.display = 'none';
     }
 
     function updateLayerStatus(num, status) {
@@ -1064,6 +1111,27 @@
               ${p.remove_count > 30 ? `<div class="plan-seg remove">... +${p.remove_count - 30} more</div>` : ''}
             </div>
           `;
+        }
+
+        // Latest agent quality-control decision
+        if (data.quality_report) {
+          const card = document.getElementById('qualityCard');
+          card.style.display = 'block';
+          const q = data.quality_report;
+          const metrics = q.metrics || {};
+          document.getElementById('qualityStats').innerHTML = `
+            <span class="stat-badge"><span class="stat-num">${q.approved ? 'PASS' : 'REVISE'}</span>decision</span>
+            <span class="stat-badge"><span class="stat-num">${q.attempt}</span>attempt</span>
+            <span class="stat-badge"><span class="stat-num">${q.issues.length}</span>issues</span>
+            ${metrics.rendered_duration != null ? `<span class="stat-badge"><span class="stat-num">${Number(metrics.rendered_duration).toFixed(1)}s</span>output</span>` : ''}
+          `;
+          document.getElementById('qualityIssues').innerHTML = q.issues.length
+            ? q.issues.map(issue => `
+                <div class="correction-row">
+                  <span class="${issue.severity === 'error' ? 'original' : 'corrected'}">${issue.code}</span>
+                  <span class="reason">${issue.message}</span>
+                </div>`).join('')
+            : '<div class="empty-state">All deterministic quality checks passed.</div>';
         }
       } catch(e) { console.error('loadResults', e); }
     }

@@ -25,14 +25,50 @@ def main():
     parser.add_argument("--fps",          type=float, default=None,
                         help="Override source FPS (default: auto-detect)")
     parser.add_argument("--subject",      default="", help="Subject hint for transcript correction")
+    parser.add_argument("--llm-provider", default=None,
+                        help="Per-run provider: claude, openai, gemini, claude_code, or ollama:model")
+    parser.add_argument("--agent",        action="store_true",
+                        help="Run the persistent orchestrator + quality/revision loop")
+    parser.add_argument("--goal",         default="Create a concise, natural rough cut.",
+                        help="Editing goal used by agent mode and LLM planning")
+    parser.add_argument("--max-attempts", type=int, default=3, choices=range(1, 6), metavar="1-5")
+    parser.add_argument("--run-id",       default=None, help="Agent run ID (required with --resume)")
+    parser.add_argument("--resume",       action="store_true", help="Resume a persisted agent run")
     parser.add_argument("--layer",        type=int, choices=[1,2,3,4],
                         help="Run only a specific layer (1-4)")
     args = parser.parse_args()
+
+    if args.agent and args.layer:
+        parser.error("--agent cannot be combined with --layer")
+    if args.resume and not args.agent:
+        parser.error("--resume requires --agent")
+    if args.resume and not args.run_id:
+        parser.error("--resume requires --run-id")
 
     t0 = time.time()
     print("\n" + "="*60)
     print("  🎬 AVEP — Autonomous Video Editing Pipeline")
     print("="*60)
+
+    if args.agent:
+        from agents.orchestrator import AgentOrchestrator
+
+        state = AgentOrchestrator().run(
+            args.video,
+            goal=args.goal,
+            skip_denoise=args.skip_denoise,
+            skip_llm=args.skip_llm,
+            subject=args.subject,
+            fps=args.fps,
+            llm_provider=args.llm_provider,
+            max_attempts=args.max_attempts,
+            run_id=args.run_id,
+            resume=args.resume,
+        )
+        print(f"\n  🤖 Agent run complete: {state.run_id} (attempt {state.attempt})")
+        elapsed = time.time() - t0
+        print(f"  ✅ Completed in {elapsed:.1f}s\n")
+        return
 
     only = args.layer
 
@@ -42,7 +78,13 @@ def main():
 
     if not only or only == 2:
         print("\n▶ LAYER 2 — Decision Agent")
-        run_decision(args.video, args.skip_llm, args.subject)
+        run_decision(
+            args.video,
+            args.skip_llm,
+            args.subject,
+            llm_provider=args.llm_provider,
+            editing_goal=args.goal,
+        )
 
     if not only or only == 3:
         print("\n▶ LAYER 3 — Metadata Bridge")

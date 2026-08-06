@@ -76,6 +76,10 @@ job_queue = JobQueue()
 
 
 async def _run_pipeline(job: dict, jobs: dict, event_queues: dict):
+    if job.get("agent_mode", False):
+        await _run_agent_pipeline(job, event_queues)
+        return
+
     job_id = job["job_id"]
     video_path = job["video_path"]
     skip_denoise = job.get("skip_denoise", False)
@@ -153,6 +157,132 @@ async def _run_pipeline(job: dict, jobs: dict, event_queues: dict):
         "job_id": job_id,
         "result": job["result"],
     })
+
+
+async def _run_agent_pipeline(job: dict, event_queues: dict):
+    from agents.orchestrator import AgentOrchestrator
+    from config.settings import get_paths
+
+    job_id = job["job_id"]
+    run_id = job.get("agent_run_id") or f"agent_{job_id}"
+    job["agent_run_id"] = run_id
+    job["status"] = PipelineStatus.RUNNING
+    _notify(event_queues, job_id, "pipeline_started", {
+        "job_id": job_id,
+        "mode": "agent",
+        "agent_run_id": run_id,
+    })
+
+    loop = asyncio.get_running_loop()
+
+    def progress_cb(event_type: str, data: dict):
+        loop.call_soon_threadsafe(
+            _handle_agent_event,
+            job,
+            event_queues,
+            event_type,
+            data,
+        )
+
+    orchestrator = AgentOrchestrator(progress_cb=progress_cb)
+    try:
+        state = await asyncio.to_thread(
+            orchestrator.run,
+            job["video_path"],
+            goal=job.get("editing_goal", "Create a concise, natural rough cut."),
+            skip_denoise=job.get("skip_denoise", False),
+            skip_llm=job.get("skip_llm", False),
+            subject=job.get("subject", ""),
+            fps=job.get("fps"),
+            llm_provider=job.get("llm_provider"),
+            max_attempts=job.get("max_attempts", 3),
+            run_id=run_id,
+        )
+    except Exception as exc:
+        job["status"] = PipelineStatus.FAILED
+        job["error"] = f"Agent run failed: {exc}"
+        failed_layer = next(
+            (number for number, layer in job["layers"].items() if layer.status == LayerStatus.FAILED),
+            None,
+        )
+        _notify(event_queues, job_id, "pipeline_failed", {
+            "job_id": job_id,
+            "failed_at_layer": failed_layer,
+            "agent_run_id": run_id,
+            "error": str(exc),
+        })
+        return
+
+    paths = get_paths(job["video_path"])
+    latest_report = state.quality_reports[-1] if state.quality_reports else None
+    job["status"] = PipelineStatus.COMPLETED
+    job["result"] = {
+        "final_output": str(paths["final_output"]),
+        "corrected_srt": str(paths["corrected_srt"]),
+        "edit_plan": str(paths["edit_plan"]),
+        "quality_report": str(paths["quality_report"]),
+        "agent_run_id": state.run_id,
+        "attempts": state.attempt,
+        "quality": latest_report.model_dump(mode="json") if latest_report else None,
+    }
+    _notify(event_queues, job_id, "pipeline_completed", {
+        "job_id": job_id,
+        "mode": "agent",
+        "agent_run_id": state.run_id,
+        "result": job["result"],
+    })
+
+
+def _handle_agent_event(
+    job: dict,
+    event_queues: dict,
+    event_type: str,
+    data: dict,
+):
+    job_id = job["job_id"]
+    layer_num = data.get("layer")
+    if layer_num in job["layers"]:
+        layer = job["layers"][layer_num]
+        if event_type == "agent_tool_started":
+            layer.status = LayerStatus.RUNNING
+            layer.started_at = datetime.now(timezone.utc)
+            layer.completed_at = None
+            layer.error = None
+            _notify(event_queues, job_id, "layer_started", {
+                "layer": layer_num,
+                "name": layer.name,
+                "attempt": data.get("attempt"),
+            })
+        elif event_type == "agent_tool_completed":
+            layer.status = LayerStatus.COMPLETED
+            layer.completed_at = datetime.now(timezone.utc)
+            _notify(event_queues, job_id, "layer_completed", {
+                "layer": layer_num,
+                "name": layer.name,
+                "attempt": data.get("attempt"),
+            })
+        elif event_type == "agent_tool_failed":
+            layer.status = LayerStatus.FAILED
+            layer.completed_at = datetime.now(timezone.utc)
+            layer.error = data.get("error")
+            _notify(event_queues, job_id, "layer_failed", {
+                "layer": layer_num,
+                "name": layer.name,
+                "error": layer.error,
+                "attempt": data.get("attempt"),
+            })
+        elif event_type == "agent_tool_progress":
+            job.setdefault("progress", {})[layer_num] = {
+                "message": data.get("message"),
+                "pct": data.get("pct"),
+            }
+            _notify(event_queues, job_id, "layer_progress", {
+                "layer": layer_num,
+                "message": data.get("message"),
+                "pct": data.get("pct"),
+            })
+
+    _notify(event_queues, job_id, event_type, data)
 
 
 def _run_layer1(video_path: str, skip_denoise: bool, progress_cb=None):

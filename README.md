@@ -1,6 +1,8 @@
 # AVEP — Autonomous Video Editing Pipeline
 
-A 4-layer agentic system that turns raw footage into a polished edit automatically.
+A hybrid video-editing agent system: a persistent orchestrator coordinates
+deterministic media tools, an edit-decision agent, and a quality-control agent
+until a render is approved or its bounded retry budget is exhausted.
 
 ## Architecture Map
 
@@ -10,6 +12,22 @@ A 4-layer agentic system that turns raw footage into a polished edit automatical
 ![AVEP repository architecture](documents/assets/avep-architecture.svg)
 
 ## Architecture
+
+Agent mode wraps the four media layers in a persistent control loop:
+
+```text
+User goal → Agent Orchestrator (SQLite state + event history)
+               │
+               ├─ Perception tool
+               ├─ Edit Decision Agent
+               ├─ Timeline export tool
+               ├─ Render tool
+               └─ Quality-Control Agent
+                         │
+                  approve ─┴─ revise/rerender → next bounded attempt
+```
+
+The original one-pass pipeline remains available when agent mode is disabled.
 
 ```
 Input Video
@@ -88,10 +106,13 @@ data/
 │       ├── edit_plan.json
 │       ├── timeline.fcpxml
 │       ├── timeline.edl
-│       └── timeline.otio
+│       ├── timeline.otio
+│       ├── quality_report.json
+│       └── quality_report_attempt_*.json
 └── output/
     └── College-Physics-Lecture/
         └── final_cut.mp4
+data/agent_runs.sqlite3        persistent agent state + event history
 ```
 
 ## Run the Web App (recommended)
@@ -121,6 +142,7 @@ Then open:
 - FPS auto-detected from the video (no manual entry)
 - Edit plans validated before timeline export or rendering
 - Final render verified with ffprobe before a job is marked complete
+- Agent mode with user goals, quality review, bounded revisions, and resumable state
 - Browse/download every intermediate + output file (`/data`, `/jobs/{id}/files`)
 
 ### API quick reference
@@ -129,7 +151,10 @@ Then open:
 # Upload + start pipeline
 curl -X POST http://localhost:8000/upload \
   -F "video=@data/input/myvideo.mp4" \
-  -F "subject=College Physics II"
+  -F "subject=College Physics II" \
+  -F "agent_mode=true" \
+  -F "editing_goal=Keep technical explanations and use natural pacing" \
+  -F "max_attempts=3"
 
 # Check job status
 curl http://localhost:8000/jobs/<job_id>
@@ -139,6 +164,9 @@ curl -N http://localhost:8000/jobs/<job_id>/stream
 
 # Download final cut
 curl -O http://localhost:8000/jobs/<job_id>/download
+
+# Inspect persisted agent state and decision history
+curl http://localhost:8000/agent-runs/<agent_run_id>
 ```
 
 ## Quick Start (CLI)
@@ -158,6 +186,17 @@ cp ~/Desktop/myvideo.mp4 data/input/
 
 # 4. Run the full pipeline
 python pipeline.py --video data/input/myvideo.mp4
+
+# Run the agent system with quality/revision attempts
+python pipeline.py --agent \
+  --video data/input/myvideo.mp4 \
+  --goal "Keep technical explanations and use natural pacing" \
+  --max-attempts 3
+
+# Resume a persisted run after interruption
+python pipeline.py --agent --resume \
+  --video data/input/myvideo.mp4 \
+  --run-id agent_<id>
 
 # 5. With subject hint for better transcript correction
 python pipeline.py --video data/input/lecture.mp4 --subject "College Physics II"

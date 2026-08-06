@@ -12,7 +12,13 @@ from layer2_decision.schemas import validate_edit_plan
 from layer1_perception.subtitle import generate_srt
 
 
-def run(video_path: str, skip_llm: bool = False, subject_hint: str = "", llm_provider: str | None = None):
+def run(
+    video_path: str,
+    skip_llm: bool = False,
+    subject_hint: str = "",
+    llm_provider: str | None = None,
+    editing_goal: str = "",
+):
     # Resolve provider per invocation so one queued job cannot affect the next.
     provider = llm_provider or LLM_PROVIDER
     ollama_model = None
@@ -48,7 +54,7 @@ def run(video_path: str, skip_llm: bool = False, subject_hint: str = "", llm_pro
         corrected = correct_transcript(words, subject_hint, provider, ollama_model)
 
         perception = {"words": corrected["corrected_words"], "silences": silences}
-        edit_plan = call_llm(perception, provider, ollama_model)
+        edit_plan = call_llm(perception, provider, ollama_model, editing_goal)
 
     media = probe_media(video_path)
     edit_plan = validate_edit_plan(edit_plan, duration=media["duration"])

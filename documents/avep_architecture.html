@@ -151,7 +151,7 @@
 
   .flow-grid {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(5, 1fr);
     gap: 0;
     border-top: 1px solid var(--border);
   }
@@ -191,6 +191,7 @@
   .flow-l2 .flow-title { color: #e76f51; }
   .flow-l3 .flow-title { color: #74b3ce; }
   .flow-l4 .flow-title { color: #b185db; }
+  .flow-qc .flow-title { color: #4ecdc4; }
 
   .flow-sub {
     font-size: 0.8rem;
@@ -919,9 +920,9 @@
 <section id="overview" class="active">
 
   <div class="overview-hero">
-    <div class="badge badge-orange">Architecture Document · v1.1 · Current Implementation</div>
+    <div class="badge badge-orange">Architecture Document · v1.2 · Hybrid Agent System</div>
     <h1>Autonomous Video<br><span>Editing Pipeline</span></h1>
-    <p>A 4-layer agentic system that separates content intelligence from media processing — turning raw footage into a validated rough cut while preserving the original source file.</p>
+    <p>A persistent orchestrator coordinates deterministic media tools, an edit-decision agent, and a quality-control agent — revising rejected renders within a bounded attempt budget while preserving the original source.</p>
   </div>
 
   <div class="flow-grid">
@@ -938,7 +939,7 @@
       <span class="flow-icon">🧠</span>
       <div class="flow-title">Decision Agent</div>
       <div class="flow-sub">The Brain</div>
-      <div class="flow-desc">Provider-scoped LLM calls or local heuristics produce a schema-validated JSON edit plan with bounded, non-overlapping timestamps.</div>
+      <div class="flow-desc">The editing goal guides provider-scoped LLM calls or local heuristics, producing a schema-validated plan with bounded timestamps.</div>
       <div class="flow-arrow">→</div>
     </div>
     <div class="flow-card flow-l3">
@@ -955,6 +956,14 @@
       <div class="flow-title">Execution</div>
       <div class="flow-sub">The Muscles</div>
       <div class="flow-desc">FFmpeg reads the validated edit plan and renders with VideoToolbox or NVENC when usable, automatically retries with libx264 when needed, then verifies the output with ffprobe.</div>
+      <div class="flow-arrow">→</div>
+    </div>
+    <div class="flow-card flow-qc">
+      <div class="flow-num">AGENT LOOP</div>
+      <span class="flow-icon">✓</span>
+      <div class="flow-title">Quality Control</div>
+      <div class="flow-sub">Approve or Revise</div>
+      <div class="flow-desc">Checks output, duration, audio, and cut length. Approval publishes the result; rejection triggers plan revision or rerender.</div>
     </div>
   </div>
 
@@ -992,6 +1001,12 @@
       </thead>
       <tbody>
         <tr>
+          <td>Orchestration / State</td>
+          <td>AgentOrchestrator + SQLite</td>
+          <td><span class="tag tag-local">Persistent · Resumable</span></td>
+          <td>Agent Runtime</td>
+        </tr>
+        <tr>
           <td>Transcription</td>
           <td>Faster-Whisper</td>
           <td><span class="tag tag-local">Local · Offline</span></td>
@@ -1027,6 +1042,12 @@
           <td><span class="tag tag-local">Local · GPU-Heavy</span></td>
           <td>Layer 4</td>
         </tr>
+        <tr>
+          <td>Quality / Revision</td>
+          <td>QualityControlAgent</td>
+          <td><span class="tag tag-local">Deterministic · Bounded</span></td>
+          <td>Agent Runtime</td>
+        </tr>
       </tbody>
     </table>
   </div>
@@ -1038,14 +1059,14 @@
   <div class="map-hero">
     <div class="badge badge-blue">One-Page Architecture · Implementation Map</div>
     <h1>The Whole Repository at a Glance</h1>
-    <p>Follow the implemented path from web and CLI entry points through perception and validated decisions, then into media-linked NLE exports or the verified FFmpeg render.</p>
+    <p>Follow the implemented path from a user goal through persistent orchestration, deterministic tools, validated decisions, quality approval, and bounded revision attempts.</p>
     <div class="map-actions">
       <a class="map-action" href="assets/avep-architecture.svg" download>Download SVG</a>
       <a class="map-action" href="assets/avep-architecture.png" download>Download PNG</a>
     </div>
   </div>
   <div class="map-canvas">
-    <img src="assets/avep-architecture.svg" alt="AVEP repository architecture: interfaces feed a FIFO queue, then perception and a validated decision agent branch into NLE timeline export and verified FFmpeg rendering, with per-video artifact storage and planned features shown separately.">
+    <img src="assets/avep-architecture.svg" alt="AVEP hybrid agent architecture: interfaces feed a persistent orchestrator, which coordinates perception, edit decisions, timeline export, rendering, and quality-control revision attempts with per-video artifacts and SQLite state.">
   </div>
 </section>
 
@@ -1130,7 +1151,7 @@
     <div class="result-emoji">🎉</div>
     <div class="result-text">
       <h3>The Magic Result</h3>
-      <p>You drop in a raw recording. AVEP transcribes, analyzes, validates, exports timelines, and produces a separate rough-cut MP4 while leaving the original source untouched.</p>
+      <p>You provide a raw recording and editing goal. AVEP persists the run, coordinates its tools, reviews the render, and either publishes an approved rough cut or revises it within the configured attempt limit.</p>
     </div>
   </div>
 
@@ -1140,9 +1161,9 @@
 <section id="developer">
 
   <div class="dev-hero">
-    <div class="badge badge-yellow">Developer Reference · Technical Spec</div>
+    <div class="badge badge-yellow">Developer Reference · Hybrid Agent Runtime</div>
     <h1>Architecture Deep Dive</h1>
-    <p>Complete technical breakdown of each layer, data contracts, toolchain specs, and integration points for engineers building or extending AVEP.</p>
+    <p>The orchestrator persists goals, steps, attempts, artifacts, quality reports, and events in SQLite while the four media layers remain deterministic tools.</p>
   </div>
 
   <div class="dev-grid">
@@ -1349,6 +1370,7 @@ ffmpeg -i input.mp4 \
         <div class="pipeline-input">edit_plan.json</div>
         <div class="pipeline-input">video.mp4 (src)</div>
         <div class="pipeline-io-label">Output</div>
+        <div class="pipeline-output">quality_report.json</div>
         <div class="pipeline-output">final_cut.mp4 ✓</div>
       </div>
     </div>
@@ -1360,9 +1382,9 @@ ffmpeg -i input.mp4 \
 <section id="tasks">
 
   <div class="tasks-hero">
-    <div class="badge badge-blue">Engineering Roadmap · Current Status</div>
+    <div class="badge badge-blue">Engineering Roadmap · Agent System v1.2</div>
     <h1>Hardening and Next Features</h1>
-    <p>The core pipeline is implemented. These original layer assignments now serve as a roadmap: reliability work is active, while deterministic duplicate detection, applied zoom effects, persistent jobs, and optional Resolve automation remain planned.</p>
+    <p>The persistent orchestrator, edit-decision agent, quality-control agent, event history, CLI resume flow, and bounded revision loop are implemented. Deterministic duplicate detection, applied zoom effects, cancellation, and optional Resolve automation remain planned.</p>
   </div>
 
   <div class="tasks-container">
