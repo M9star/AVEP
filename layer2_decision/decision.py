@@ -4,10 +4,11 @@ Run:  python -m layer2_decision.decision --video data/input/myvideo.mp4
 """
 import json
 import argparse
-from config.settings import get_paths, LLM_PROVIDER
+from config.settings import get_paths, probe_media, LLM_PROVIDER
 from layer2_decision.heuristics import flag_filler_words, flag_long_silences, build_edit_plan
 from layer2_decision.agent import call_llm
 from layer2_decision.corrector import correct_transcript
+from layer2_decision.schemas import validate_edit_plan
 from layer1_perception.subtitle import generate_srt
 
 
@@ -48,6 +49,9 @@ def run(video_path: str, skip_llm: bool = False, subject_hint: str = "", llm_pro
 
         perception = {"words": corrected["corrected_words"], "silences": silences}
         edit_plan = call_llm(perception, provider, ollama_model)
+
+    media = probe_media(video_path)
+    edit_plan = validate_edit_plan(edit_plan, duration=media["duration"])
 
     # Save corrected transcript
     corrected_output = {

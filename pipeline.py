@@ -22,7 +22,8 @@ def main():
     parser.add_argument("--video",        required=True, help="Path to input video")
     parser.add_argument("--skip-denoise", action="store_true")
     parser.add_argument("--skip-llm",     action="store_true")
-    parser.add_argument("--fps",          type=float, default=30.0)
+    parser.add_argument("--fps",          type=float, default=None,
+                        help="Override source FPS (default: auto-detect)")
     parser.add_argument("--subject",      default="", help="Subject hint for transcript correction")
     parser.add_argument("--layer",        type=int, choices=[1,2,3,4],
                         help="Run only a specific layer (1-4)")

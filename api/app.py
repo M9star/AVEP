@@ -91,12 +91,13 @@ async def upload_video(
     if not video.filename:
         raise HTTPException(400, "No filename provided")
 
-    ext = Path(video.filename).suffix.lower()
+    original_name = Path(video.filename).name
+    ext = Path(original_name).suffix.lower()
     if ext not in ALLOWED_EXT:
         raise HTTPException(400, f"Unsupported format: {ext}. Allowed: {ALLOWED_EXT}")
 
     INPUT_DIR.mkdir(parents=True, exist_ok=True)
-    save_name = f"{uuid.uuid4().hex[:8]}_{video.filename}"
+    save_name = f"{uuid.uuid4().hex[:8]}_{original_name}"
     save_path = INPUT_DIR / save_name
 
     def _write():
@@ -104,7 +105,7 @@ async def upload_video(
             shutil.copyfileobj(video.file, f, length=1024 * 1024)
     await asyncio.to_thread(_write)
 
-    return await _enqueue_job(str(save_path), video.filename,
+    return await _enqueue_job(str(save_path), original_name,
                               skip_denoise, skip_llm, subject, fps, llm_provider)
 
 

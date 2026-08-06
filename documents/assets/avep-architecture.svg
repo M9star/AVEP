@@ -1,0 +1,244 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1120" viewBox="0 0 1800 1120" role="img" aria-labelledby="title desc">
+  <title id="title">AVEP autonomous video editing pipeline architecture</title>
+  <desc id="desc">Repository architecture showing interfaces, queue, four processing layers, validated data contracts, NLE exports, FFmpeg rendering, storage, and planned capabilities.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#07111f"/>
+      <stop offset="1" stop-color="#111827"/>
+    </linearGradient>
+    <linearGradient id="header" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#ff6b35"/>
+      <stop offset="1" stop-color="#ff9f43"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000" flood-opacity="0.28"/>
+    </filter>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#94a3b8"/>
+    </marker>
+    <marker id="arrowOrange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#ff8a4c"/>
+    </marker>
+    <style>
+      .title { font: 700 38px system-ui, -apple-system, sans-serif; fill: #f8fafc; letter-spacing: .4px; }
+      .subtitle { font: 400 17px system-ui, -apple-system, sans-serif; fill: #94a3b8; }
+      .eyebrow { font: 700 12px ui-monospace, SFMono-Regular, Menlo, monospace; fill: #ff9f70; letter-spacing: 2px; }
+      .section { font: 700 13px ui-monospace, SFMono-Regular, Menlo, monospace; fill: #94a3b8; letter-spacing: 1.8px; }
+      .cardTitle { font: 700 23px system-ui, -apple-system, sans-serif; fill: #f8fafc; }
+      .cardSub { font: 600 14px system-ui, -apple-system, sans-serif; fill: #cbd5e1; }
+      .body { font: 400 14px system-ui, -apple-system, sans-serif; fill: #cbd5e1; }
+      .small { font: 400 12px system-ui, -apple-system, sans-serif; fill: #94a3b8; }
+      .mono { font: 500 12px ui-monospace, SFMono-Regular, Menlo, monospace; fill: #dbeafe; }
+      .chip { font: 700 11px ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .7px; }
+      .arrow { stroke: #94a3b8; stroke-width: 3; fill: none; marker-end: url(#arrow); }
+      .arrowHot { stroke: #ff8a4c; stroke-width: 3.5; fill: none; marker-end: url(#arrowOrange); }
+      .dash { stroke: #64748b; stroke-width: 2; stroke-dasharray: 7 7; fill: none; marker-end: url(#arrow); }
+    </style>
+  </defs>
+
+  <rect width="1800" height="1120" rx="28" fill="url(#bg)"/>
+  <circle cx="1680" cy="70" r="230" fill="#ff6b35" opacity="0.055"/>
+  <circle cx="100" cy="1040" r="260" fill="#4ecdc4" opacity="0.045"/>
+
+  <!-- Header -->
+  <g transform="translate(58 42)">
+    <rect x="0" y="0" width="10" height="82" rx="5" fill="url(#header)"/>
+    <text x="34" y="20" class="eyebrow">AVEP · REPOSITORY ARCHITECTURE · IMPLEMENTED v1.1</text>
+    <text x="34" y="60" class="title">Autonomous Video Editing Pipeline</text>
+    <text x="34" y="88" class="subtitle">Raw footage → perception → validated decisions → NLE timelines + verified final render</text>
+  </g>
+  <g transform="translate(1450 48)">
+    <rect width="286" height="68" rx="14" fill="#0f1d31" stroke="#334155"/>
+    <circle cx="24" cy="23" r="6" fill="#22c55e"/>
+    <text x="40" y="27" class="cardSub">Original media preserved</text>
+    <circle cx="24" cy="47" r="6" fill="#60a5fa"/>
+    <text x="40" y="51" class="small">Local-first, provider optional</text>
+  </g>
+
+  <!-- Entry and orchestration -->
+  <text x="60" y="172" class="section">01 · ENTRY &amp; ORCHESTRATION</text>
+  <g filter="url(#shadow)">
+    <rect x="60" y="192" width="205" height="88" rx="14" fill="#132238" stroke="#3b82f6"/>
+    <text x="84" y="226" class="cardSub">Web UI</text>
+    <text x="84" y="250" class="mono">api/static/index.html</text>
+    <text x="84" y="269" class="small">Upload · queue · progress</text>
+
+    <rect x="290" y="192" width="205" height="88" rx="14" fill="#132238" stroke="#3b82f6"/>
+    <text x="314" y="226" class="cardSub">REST + SSE API</text>
+    <text x="314" y="250" class="mono">api/app.py</text>
+    <text x="314" y="269" class="small">Jobs · files · live events</text>
+
+    <rect x="520" y="192" width="205" height="88" rx="14" fill="#132238" stroke="#3b82f6"/>
+    <text x="544" y="226" class="cardSub">CLI</text>
+    <text x="544" y="250" class="mono">pipeline.py</text>
+    <text x="544" y="269" class="small">Full or per-layer execution</text>
+
+    <rect x="810" y="184" width="315" height="104" rx="16" fill="#172033" stroke="#a78bfa" stroke-width="2"/>
+    <rect x="830" y="202" width="78" height="23" rx="11" fill="#6d28d9"/>
+    <text x="844" y="218" class="chip" fill="#ede9fe">FIFO</text>
+    <text x="830" y="253" class="cardTitle">Job Queue</text>
+    <text x="830" y="276" class="mono">api/pipeline_runner.py</text>
+
+    <rect x="1210" y="192" width="250" height="88" rx="14" fill="#132238" stroke="#4ecdc4"/>
+    <text x="1234" y="226" class="cardSub">Per-video workspace</text>
+    <text x="1234" y="250" class="mono">data/intermediate/&lt;video&gt;</text>
+    <text x="1234" y="269" class="small">Isolated artifacts and results</text>
+
+    <rect x="1485" y="192" width="250" height="88" rx="14" fill="#132238" stroke="#4ecdc4"/>
+    <text x="1509" y="226" class="cardSub">Central configuration</text>
+    <text x="1509" y="250" class="mono">config/settings.py</text>
+    <text x="1509" y="269" class="small">Paths · models · ffprobe</text>
+  </g>
+  <path d="M 265 236 H 290" class="arrow"/>
+  <path d="M 495 236 H 810" class="arrow"/>
+  <path d="M 725 248 C 760 248 770 256 810 256" class="arrow"/>
+  <path d="M 1125 236 H 1210" class="arrow"/>
+  <path d="M 1460 236 H 1485" class="dash"/>
+
+  <!-- Main pipeline -->
+  <text x="60" y="334" class="section">02 · CONTENT INTELLIGENCE PIPELINE</text>
+
+  <!-- Layer 1 -->
+  <g filter="url(#shadow)">
+    <rect x="60" y="354" width="390" height="346" rx="20" fill="#102a27" stroke="#34d399" stroke-width="2"/>
+    <rect x="82" y="376" width="92" height="25" rx="12" fill="#065f46"/>
+    <text x="96" y="393" class="chip" fill="#d1fae5">LAYER 01</text>
+    <text x="82" y="439" class="cardTitle">Perception</text>
+    <text x="82" y="464" class="cardSub">Turn media into timestamped signals</text>
+
+    <rect x="82" y="487" width="346" height="42" rx="9" fill="#0b201e" stroke="#245a50"/>
+    <text x="98" y="513" class="body">① FFmpeg audio extraction · mono 16 kHz</text>
+    <rect x="82" y="539" width="346" height="42" rx="9" fill="#0b201e" stroke="#245a50"/>
+    <text x="98" y="565" class="body">② DeepFilterNet · optional denoise</text>
+    <rect x="82" y="591" width="346" height="42" rx="9" fill="#0b201e" stroke="#245a50"/>
+    <text x="98" y="617" class="body">③ Faster-Whisper · word timestamps</text>
+    <rect x="82" y="643" width="346" height="42" rx="9" fill="#0b201e" stroke="#245a50"/>
+    <text x="98" y="669" class="body">④ Silero VAD · silence + sync onsets</text>
+  </g>
+
+  <!-- Contract 1 -->
+  <g>
+    <path d="M 450 526 H 500" class="arrowHot"/>
+    <rect x="465" y="454" width="145" height="144" rx="14" fill="#172033" stroke="#475569"/>
+    <text x="483" y="482" class="section">OUTPUTS</text>
+    <text x="483" y="510" class="mono">raw_words.json</text>
+    <text x="483" y="537" class="mono">silence_noise_</text>
+    <text x="483" y="554" class="mono">map.json</text>
+    <text x="483" y="581" class="mono">preview.srt</text>
+  </g>
+
+  <!-- Layer 2 -->
+  <g filter="url(#shadow)">
+    <rect x="640" y="354" width="430" height="346" rx="20" fill="#331d1a" stroke="#fb7185" stroke-width="2"/>
+    <rect x="662" y="376" width="92" height="25" rx="12" fill="#9f1239"/>
+    <text x="676" y="393" class="chip" fill="#ffe4e6">LAYER 02</text>
+    <text x="662" y="439" class="cardTitle">Decision Agent</text>
+    <text x="662" y="464" class="cardSub">Correct, decide, normalize, validate</text>
+
+    <rect x="662" y="487" width="386" height="47" rx="9" fill="#271614" stroke="#71342e"/>
+    <text x="678" y="507" class="body">Transcript correction</text>
+    <text x="678" y="524" class="small">Subject-aware chunks · timestamps preserved</text>
+
+    <rect x="662" y="544" width="186" height="61" rx="9" fill="#271614" stroke="#71342e"/>
+    <text x="678" y="568" class="body">Heuristic mode</text>
+    <text x="678" y="588" class="small">Fillers + long silence</text>
+    <rect x="862" y="544" width="186" height="61" rx="9" fill="#271614" stroke="#71342e"/>
+    <text x="878" y="568" class="body">LLM mode</text>
+    <text x="878" y="588" class="small">Cloud or local provider</text>
+
+    <rect x="662" y="615" width="386" height="70" rx="9" fill="#451a23" stroke="#fb7185"/>
+    <text x="678" y="641" class="body">Pydantic validation boundary</text>
+    <text x="678" y="662" class="small">Finite · bounded · ordered · non-overlapping</text>
+  </g>
+  <path d="M 610 526 H 640" class="arrowHot"/>
+
+  <!-- Validated contract -->
+  <g filter="url(#shadow)">
+    <rect x="1115" y="426" width="230" height="204" rx="18" fill="#24213b" stroke="#a78bfa" stroke-width="2"/>
+    <rect x="1137" y="448" width="104" height="25" rx="12" fill="#6d28d9"/>
+    <text x="1151" y="465" class="chip" fill="#ede9fe">CONTRACT</text>
+    <text x="1137" y="510" class="cardTitle">Edit Plan</text>
+    <text x="1137" y="538" class="mono">keep_segments[]</text>
+    <text x="1137" y="565" class="mono">remove_segments[]</text>
+    <text x="1137" y="592" class="mono">flag_zoom[]</text>
+    <text x="1137" y="615" class="small">edit_plan.json</text>
+  </g>
+  <path d="M 1070 526 H 1115" class="arrowHot"/>
+
+  <!-- Branch outputs -->
+  <text x="1390" y="334" class="section">03 · TWO OUTPUT PATHS</text>
+  <path d="M 1345 526 C 1370 526 1360 420 1390 420" class="arrow"/>
+  <path d="M 1345 526 C 1370 526 1360 656 1390 656" class="arrowHot"/>
+
+  <g filter="url(#shadow)">
+    <rect x="1390" y="354" width="350" height="205" rx="20" fill="#15283b" stroke="#60a5fa" stroke-width="2"/>
+    <rect x="1412" y="376" width="92" height="25" rx="12" fill="#1d4ed8"/>
+    <text x="1426" y="393" class="chip" fill="#dbeafe">LAYER 03</text>
+    <text x="1412" y="438" class="cardTitle">NLE Export</text>
+    <text x="1412" y="463" class="cardSub">Media-linked OpenTimelineIO</text>
+    <text x="1412" y="493" class="body">FCPXML · Final Cut / Resolve</text>
+    <text x="1412" y="518" class="body">CMX 3600 EDL · NLE fallback</text>
+    <text x="1412" y="543" class="body">OTIO JSON · interchange</text>
+
+    <rect x="1390" y="586" width="350" height="230" rx="20" fill="#2b1e38" stroke="#c084fc" stroke-width="2"/>
+    <rect x="1412" y="608" width="92" height="25" rx="12" fill="#7e22ce"/>
+    <text x="1426" y="625" class="chip" fill="#f3e8ff">LAYER 04</text>
+    <text x="1412" y="670" class="cardTitle">Verified Render</text>
+    <text x="1412" y="695" class="cardSub">FFmpeg select + aselect</text>
+    <text x="1412" y="727" class="body">VideoToolbox / NVENC</text>
+    <text x="1412" y="751" class="body">↳ runtime fallback to libx264</text>
+    <text x="1412" y="775" class="body">Temporary output → ffprobe → publish</text>
+    <rect x="1510" y="789" width="206" height="36" rx="10" fill="#581c87" stroke="#d8b4fe"/>
+    <text x="1530" y="812" class="mono">final_cut.mp4 ✓</text>
+  </g>
+
+  <!-- Storage and contracts -->
+  <text x="60" y="756" class="section">04 · PER-VIDEO ARTIFACT STORE</text>
+  <g filter="url(#shadow)">
+    <rect x="60" y="776" width="1285" height="240" rx="20" fill="#101b2d" stroke="#334155"/>
+    <text x="84" y="812" class="cardTitle">data/</text>
+
+    <rect x="84" y="834" width="250" height="150" rx="13" fill="#0b1525" stroke="#334155"/>
+    <text x="104" y="862" class="cardSub">input/</text>
+    <text x="104" y="891" class="mono">uploaded-video.mp4</text>
+    <text x="104" y="920" class="small">Original source</text>
+    <text x="104" y="942" class="small">Never overwritten</text>
+
+    <rect x="356" y="834" width="540" height="150" rx="13" fill="#0b1525" stroke="#334155"/>
+    <text x="376" y="862" class="cardSub">intermediate/&lt;video&gt;/</text>
+    <text x="376" y="892" class="mono">raw_audio.wav · raw_words.json · corrected.srt</text>
+    <text x="376" y="919" class="mono">silence_noise_map.json · edit_plan.json</text>
+    <text x="376" y="946" class="mono">timeline.fcpxml · timeline.edl · timeline.otio</text>
+
+    <rect x="918" y="834" width="403" height="150" rx="13" fill="#0b1525" stroke="#334155"/>
+    <text x="938" y="862" class="cardSub">output/&lt;video&gt;/</text>
+    <text x="938" y="892" class="mono">final_cut.mp4</text>
+    <text x="938" y="921" class="small">Atomic publish after validation</text>
+    <text x="938" y="946" class="small">Download through job API</text>
+  </g>
+  <path d="M 255 700 V 776" class="dash"/>
+  <path d="M 855 700 V 736 H 640 V 776" class="dash"/>
+  <path d="M 1510 816 V 1038 H 1120 V 984" class="dash"/>
+
+  <!-- Roadmap -->
+  <g>
+    <rect x="1390" y="852" width="350" height="164" rx="18" fill="#171d2b" stroke="#64748b" stroke-dasharray="7 6"/>
+    <text x="1412" y="883" class="section">PLANNED / NEXT</text>
+    <text x="1412" y="915" class="body">○ Deterministic repeated-take detection</text>
+    <text x="1412" y="943" class="body">○ Apply zoom flags during rendering</text>
+    <text x="1412" y="971" class="body">○ Persistent jobs + cancellation</text>
+    <text x="1412" y="999" class="body">○ Optional Resolve automation</text>
+  </g>
+
+  <!-- Footer -->
+  <line x1="60" y1="1055" x2="1740" y2="1055" stroke="#334155"/>
+  <g transform="translate(60 1075)">
+    <circle cx="8" cy="8" r="6" fill="#22c55e"/>
+    <text x="24" y="13" class="small">Implemented</text>
+    <circle cx="130" cy="8" r="6" fill="#f59e0b"/>
+    <text x="146" y="13" class="small">Optional/provider-dependent</text>
+    <circle cx="358" cy="8" r="6" fill="#64748b"/>
+    <text x="374" y="13" class="small">Planned</text>
+  </g>
+  <text x="1740" y="1088" class="small" text-anchor="end">Source: AVEP repository · documents/avep_architecture.html</text>
+</svg>

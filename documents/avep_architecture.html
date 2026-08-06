@@ -1,0 +1,1622 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AVEP — Autonomous Video Editing Pipeline</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #111118;
+    --surface2: #1a1a24;
+    --border: #2a2a3a;
+    --accent: #ff6b35;
+    --accent2: #4ecdc4;
+    --accent3: #ffe66d;
+    --accent4: #a8edea;
+    --text: #e8e8f0;
+    --text-dim: #888899;
+    --text-dimmer: #555566;
+    --layer1: #2d6a4f;
+    --layer2: #e76f51;
+    --layer3: #457b9d;
+    --layer4: #7209b7;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'IBM Plex Sans', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── NAV ── */
+  nav {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 100;
+    background: rgba(10,10,15,0.92);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 2rem;
+    height: 64px;
+    gap: 0;
+  }
+
+  .nav-logo {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.1em;
+    margin-right: 3rem;
+    white-space: nowrap;
+  }
+
+  .nav-tabs {
+    display: flex;
+    gap: 0;
+    flex: 1;
+    height: 100%;
+    overflow-x: auto;
+  }
+
+  .nav-tab {
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    padding: 0 1.4rem;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-family: 'Syne', sans-serif;
+    font-size: 0.82rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    position: relative;
+  }
+
+  .nav-tab:focus-visible { outline: 2px solid currentColor; outline-offset: -3px; }
+
+  .nav-tab:hover { color: var(--text); background: rgba(255,255,255,0.03); }
+
+  .nav-tab.active { color: var(--text); }
+  .nav-tab[data-tab="overview"].active { border-bottom-color: var(--accent); color: var(--accent); }
+  .nav-tab[data-tab="map"].active { border-bottom-color: #60a5fa; color: #60a5fa; }
+  .nav-tab[data-tab="visual"].active { border-bottom-color: var(--accent2); color: var(--accent2); }
+  .nav-tab[data-tab="developer"].active { border-bottom-color: var(--accent3); color: var(--accent3); }
+  .nav-tab[data-tab="tasks"].active { border-bottom-color: var(--accent4); color: var(--accent4); }
+
+  .tab-icon { font-size: 1rem; }
+
+  /* ── SECTIONS ── */
+  section {
+    display: none;
+    padding-top: 64px;
+    min-height: 100vh;
+  }
+  section.active { display: block; }
+
+  /* ── OVERVIEW ── */
+  .overview-hero {
+    padding: 5rem 4rem 3rem;
+    border-bottom: 1px solid var(--border);
+    background: radial-gradient(ellipse at 70% 0%, rgba(255,107,53,0.08) 0%, transparent 60%);
+  }
+
+  .badge {
+    display: inline-block;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    padding: 0.3rem 0.8rem;
+    border-radius: 2px;
+    margin-bottom: 1.5rem;
+  }
+  .badge-orange { background: rgba(255,107,53,0.15); color: var(--accent); border: 1px solid rgba(255,107,53,0.3); }
+  .badge-teal { background: rgba(78,205,196,0.12); color: var(--accent2); border: 1px solid rgba(78,205,196,0.25); }
+  .badge-yellow { background: rgba(255,230,109,0.12); color: var(--accent3); border: 1px solid rgba(255,230,109,0.25); }
+  .badge-blue { background: rgba(168,237,234,0.1); color: var(--accent4); border: 1px solid rgba(168,237,234,0.2); }
+
+  .overview-hero h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(2.5rem, 5vw, 4.5rem);
+    font-weight: 800;
+    line-height: 1.05;
+    color: #fff;
+    margin-bottom: 1.2rem;
+  }
+
+  .overview-hero h1 span { color: var(--accent); }
+
+  .overview-hero p {
+    font-size: 1.1rem;
+    color: var(--text-dim);
+    max-width: 640px;
+    line-height: 1.7;
+  }
+
+  .flow-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0;
+    border-top: 1px solid var(--border);
+  }
+
+  .flow-card {
+    padding: 2.5rem 2rem;
+    border-right: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    position: relative;
+    transition: background 0.2s ease;
+  }
+  .flow-card:last-child { border-right: none; }
+  .flow-card:hover { background: rgba(255,255,255,0.02); }
+
+  .flow-num {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.2em;
+    color: var(--text-dimmer);
+    margin-bottom: 1rem;
+  }
+
+  .flow-icon {
+    font-size: 2rem;
+    margin-bottom: 1rem;
+    display: block;
+  }
+
+  .flow-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 1rem;
+    font-weight: 700;
+    margin-bottom: 0.6rem;
+  }
+
+  .flow-l1 .flow-title { color: #52b788; }
+  .flow-l2 .flow-title { color: #e76f51; }
+  .flow-l3 .flow-title { color: #74b3ce; }
+  .flow-l4 .flow-title { color: #b185db; }
+
+  .flow-sub {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    font-family: 'Space Mono', monospace;
+    margin-bottom: 0.8rem;
+  }
+
+  .flow-desc { font-size: 0.88rem; color: var(--text-dim); line-height: 1.6; }
+
+  .flow-arrow {
+    position: absolute;
+    right: -14px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 28px;
+    height: 28px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    color: var(--text-dimmer);
+    z-index: 1;
+  }
+  .flow-card:last-child .flow-arrow { display: none; }
+
+  /* Why it wins */
+  .wins-section {
+    padding: 3rem 4rem;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .wins-section h2 {
+    font-family: 'Syne', sans-serif;
+    font-size: 1.4rem;
+    font-weight: 700;
+    margin-bottom: 2rem;
+    color: var(--text);
+  }
+
+  .wins-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+  }
+
+  .win-card {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1.5rem;
+  }
+
+  .win-icon { font-size: 1.5rem; margin-bottom: 0.8rem; }
+
+  .win-title {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: var(--accent);
+    margin-bottom: 0.5rem;
+  }
+
+  .win-desc { font-size: 0.85rem; color: var(--text-dim); line-height: 1.6; }
+
+  /* tool table */
+  .tools-section {
+    padding: 3rem 4rem;
+  }
+
+  .tools-section h2 {
+    font-family: 'Syne', sans-serif;
+    font-size: 1.4rem;
+    font-weight: 700;
+    margin-bottom: 2rem;
+  }
+
+  .tools-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.88rem;
+  }
+
+  .tools-table th {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-dimmer);
+    text-align: left;
+    padding: 0.7rem 1rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .tools-table td {
+    padding: 0.9rem 1rem;
+    border-bottom: 1px solid rgba(42,42,58,0.6);
+    color: var(--text-dim);
+  }
+
+  .tools-table td:first-child { color: var(--text); font-weight: 500; }
+  .tools-table td:nth-child(2) { font-family: 'Space Mono', monospace; font-size: 0.8rem; color: var(--accent2); }
+
+  .tag {
+    display: inline-block;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.65rem;
+    padding: 0.15rem 0.5rem;
+    border-radius: 2px;
+    letter-spacing: 0.1em;
+  }
+
+  .tag-local { background: rgba(82,183,136,0.15); color: #52b788; border: 1px solid rgba(82,183,136,0.25); }
+  .tag-cloud { background: rgba(231,111,81,0.15); color: #e76f51; border: 1px solid rgba(231,111,81,0.25); }
+  .tag-hybrid { background: rgba(116,179,206,0.15); color: #74b3ce; border: 1px solid rgba(116,179,206,0.25); }
+
+  /* ── SYSTEM MAP ── */
+  .map-hero {
+    padding: 4rem 4rem 2rem;
+    border-bottom: 1px solid var(--border);
+    background: radial-gradient(ellipse at 50% 0%, rgba(96,165,250,0.08) 0%, transparent 60%);
+  }
+
+  .map-hero h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(2rem, 4vw, 3.2rem);
+    font-weight: 800;
+    color: #fff;
+    margin-bottom: 0.8rem;
+  }
+
+  .map-hero p { font-size: 0.95rem; color: var(--text-dim); max-width: 720px; line-height: 1.7; }
+
+  .map-actions { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 1.4rem; }
+  .map-action {
+    color: #bfdbfe;
+    border: 1px solid rgba(96,165,250,0.4);
+    background: rgba(96,165,250,0.1);
+    padding: 0.55rem 0.9rem;
+    border-radius: 4px;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.75rem;
+    text-decoration: none;
+  }
+  .map-action:hover { background: rgba(96,165,250,0.18); }
+  .map-action:focus-visible { outline: 2px solid #60a5fa; outline-offset: 2px; }
+
+  .map-canvas { padding: 2rem 4rem 4rem; }
+  .map-canvas img {
+    width: 100%;
+    height: auto;
+    display: block;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: #07111f;
+  }
+
+  /* ── VISUAL (5-YEAR-OLD) ── */
+  .visual-hero {
+    padding: 4rem 4rem 2rem;
+    text-align: center;
+    background: radial-gradient(ellipse at 50% 0%, rgba(78,205,196,0.08) 0%, transparent 60%);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .visual-hero h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(2rem, 4vw, 3.5rem);
+    font-weight: 800;
+    color: #fff;
+    margin-bottom: 0.8rem;
+  }
+
+  .visual-hero p {
+    font-size: 1rem;
+    color: var(--text-dim);
+    max-width: 500px;
+    margin: 0 auto;
+  }
+
+  .story-flow {
+    padding: 3rem 4rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .story-step {
+    display: grid;
+    grid-template-columns: 120px 40px 1fr;
+    gap: 0 1.5rem;
+    align-items: start;
+    padding: 2rem 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .story-step:last-child { border-bottom: none; }
+
+  .step-emoji-box {
+    width: 100px;
+    height: 100px;
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 3rem;
+    flex-shrink: 0;
+  }
+
+  .step-line-area {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding-top: 10px;
+  }
+
+  .step-dot {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .step-line {
+    width: 2px;
+    flex: 1;
+    min-height: 80px;
+    margin-top: 4px;
+  }
+
+  .step-content { padding-top: 0.5rem; }
+
+  .step-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 0.4rem;
+  }
+
+  .step-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: #fff;
+    margin-bottom: 0.5rem;
+  }
+
+  .step-plain {
+    font-size: 1rem;
+    line-height: 1.7;
+    color: var(--text-dim);
+    max-width: 600px;
+    margin-bottom: 0.8rem;
+  }
+
+  .step-analogy {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.9rem;
+    border-radius: 30px;
+    font-size: 0.82rem;
+    font-style: italic;
+  }
+
+  .s1 { background: rgba(82,183,136,0.1); }
+  .s1 .step-dot { background: #52b788; }
+  .s1 .step-line { background: linear-gradient(#52b788, rgba(82,183,136,0.1)); }
+  .s1 .step-emoji-box { background: rgba(82,183,136,0.12); }
+  .s1 .step-label { color: #52b788; }
+  .s1 .step-analogy { background: rgba(82,183,136,0.1); color: #52b788; border: 1px solid rgba(82,183,136,0.2); }
+
+  .s2 { background: rgba(231,111,81,0.05); }
+  .s2 .step-dot { background: #e76f51; }
+  .s2 .step-line { background: linear-gradient(#e76f51, rgba(231,111,81,0.1)); }
+  .s2 .step-emoji-box { background: rgba(231,111,81,0.12); }
+  .s2 .step-label { color: #e76f51; }
+  .s2 .step-analogy { background: rgba(231,111,81,0.1); color: #e76f51; border: 1px solid rgba(231,111,81,0.2); }
+
+  .s3 { background: rgba(116,179,206,0.05); }
+  .s3 .step-dot { background: #74b3ce; }
+  .s3 .step-line { background: linear-gradient(#74b3ce, rgba(116,179,206,0.1)); }
+  .s3 .step-emoji-box { background: rgba(116,179,206,0.12); }
+  .s3 .step-label { color: #74b3ce; }
+  .s3 .step-analogy { background: rgba(116,179,206,0.1); color: #74b3ce; border: 1px solid rgba(116,179,206,0.2); }
+
+  .s4 { background: rgba(177,133,219,0.05); }
+  .s4 .step-dot { background: #b185db; }
+  .s4 .step-line { background: linear-gradient(#b185db, transparent); }
+  .s4 .step-emoji-box { background: rgba(177,133,219,0.12); }
+  .s4 .step-label { color: #b185db; }
+  .s4 .step-analogy { background: rgba(177,133,219,0.1); color: #b185db; border: 1px solid rgba(177,133,219,0.2); }
+
+  .result-box {
+    margin: 2rem 4rem 4rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 2rem;
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+  }
+
+  .result-emoji { font-size: 3rem; }
+  .result-text h3 {
+    font-family: 'Syne', sans-serif;
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--accent2);
+    margin-bottom: 0.4rem;
+  }
+  .result-text p { color: var(--text-dim); font-size: 0.9rem; line-height: 1.6; }
+
+  /* ── DEVELOPER ── */
+  .dev-hero {
+    padding: 4rem 4rem 2rem;
+    border-bottom: 1px solid var(--border);
+    background: radial-gradient(ellipse at 30% 0%, rgba(255,230,109,0.07) 0%, transparent 60%);
+  }
+
+  .dev-hero h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(2rem, 4vw, 3.2rem);
+    font-weight: 800;
+    color: #fff;
+    margin-bottom: 0.8rem;
+  }
+
+  .dev-hero p { font-size: 0.95rem; color: var(--text-dim); max-width: 600px; line-height: 1.7; }
+
+  .dev-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0;
+    border-top: 1px solid var(--border);
+  }
+
+  .dev-card {
+    padding: 2.5rem;
+    border-right: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .dev-card:nth-child(2n) { border-right: none; }
+
+  .dev-card-header {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .dev-layer-tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    padding: 0.2rem 0.6rem;
+    border-radius: 2px;
+  }
+
+  .dev-card h3 {
+    font-family: 'Syne', sans-serif;
+    font-size: 1.1rem;
+    font-weight: 700;
+  }
+
+  .dev-section-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--text-dimmer);
+    margin-bottom: 0.6rem;
+    margin-top: 1.2rem;
+  }
+
+  .code-block {
+    background: #080810;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1rem 1.2rem;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.75rem;
+    color: #a8b2d8;
+    line-height: 1.7;
+    overflow-x: auto;
+    white-space: pre;
+  }
+
+  .code-comment { color: #4a5568; }
+  .code-kw { color: #e76f51; }
+  .code-str { color: #52b788; }
+  .code-fn { color: #74b3ce; }
+  .code-var { color: #ffe66d; }
+  .code-num { color: #b185db; }
+
+  .spec-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    margin-top: 0.4rem;
+  }
+
+  .spec-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.6rem;
+    font-size: 0.85rem;
+    color: var(--text-dim);
+    line-height: 1.5;
+  }
+
+  .spec-item::before {
+    content: "→";
+    color: var(--text-dimmer);
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  .spec-item strong { color: var(--text); }
+
+  .data-flow-section {
+    padding: 3rem 4rem;
+    border-top: 1px solid var(--border);
+  }
+
+  .data-flow-section h2 {
+    font-family: 'Syne', sans-serif;
+    font-size: 1.3rem;
+    font-weight: 700;
+    margin-bottom: 2rem;
+  }
+
+  .pipeline-viz {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+
+  .pipeline-stage {
+    flex: 1;
+    padding: 1.5rem 1.2rem;
+    border-right: 1px solid var(--border);
+    position: relative;
+  }
+
+  .pipeline-stage:last-child { border-right: none; }
+
+  .pipeline-stage-num {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.6rem;
+    letter-spacing: 0.2em;
+    color: var(--text-dimmer);
+    margin-bottom: 0.5rem;
+  }
+
+  .pipeline-stage-name {
+    font-family: 'Syne', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 700;
+    margin-bottom: 0.8rem;
+  }
+
+  .pipeline-input, .pipeline-output {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.7rem;
+    padding: 0.3rem 0.5rem;
+    border-radius: 3px;
+    margin-bottom: 0.3rem;
+  }
+
+  .pipeline-input { background: rgba(255,255,255,0.04); color: var(--text-dimmer); }
+  .pipeline-output { background: rgba(255,255,255,0.07); color: var(--text); }
+
+  .pipeline-io-label {
+    font-size: 0.6rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-dimmer);
+    margin-top: 0.8rem;
+    margin-bottom: 0.3rem;
+    font-family: 'Space Mono', monospace;
+  }
+
+  /* ── TASKS ── */
+  .tasks-hero {
+    padding: 4rem 4rem 2rem;
+    border-bottom: 1px solid var(--border);
+    background: radial-gradient(ellipse at 80% 0%, rgba(168,237,234,0.07) 0%, transparent 60%);
+  }
+
+  .tasks-hero h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(2rem, 4vw, 3.2rem);
+    font-weight: 800;
+    color: #fff;
+    margin-bottom: 0.8rem;
+  }
+
+  .tasks-hero p { font-size: 0.95rem; color: var(--text-dim); max-width: 600px; line-height: 1.7; }
+
+  .tasks-container {
+    padding: 3rem 4rem;
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+  }
+
+  .task-block {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+
+  .task-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.2rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .task-header-left {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .task-num {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.15em;
+    color: var(--text-dimmer);
+  }
+
+  .task-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text);
+  }
+
+  .task-status {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.1em;
+    padding: 0.25rem 0.7rem;
+    border-radius: 2px;
+  }
+
+  .status-start { background: rgba(255,107,53,0.15); color: var(--accent); border: 1px solid rgba(255,107,53,0.3); }
+  .status-mid { background: rgba(255,230,109,0.12); color: var(--accent3); border: 1px solid rgba(255,230,109,0.25); }
+  .status-adv { background: rgba(177,133,219,0.12); color: #b185db; border: 1px solid rgba(177,133,219,0.25); }
+
+  .task-body {
+    padding: 1.5rem;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 1.5rem;
+  }
+
+  .task-col-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.62rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--text-dimmer);
+    margin-bottom: 0.7rem;
+  }
+
+  .task-col ul {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .task-col li {
+    font-size: 0.84rem;
+    color: var(--text-dim);
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    line-height: 1.4;
+  }
+
+  .task-col li .li-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--text-dimmer);
+    flex-shrink: 0;
+    margin-top: 6px;
+  }
+
+  .task-deliverable {
+    background: var(--surface);
+    padding: 1rem 1.5rem;
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+  }
+
+  .task-del-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-dimmer);
+    white-space: nowrap;
+  }
+
+  .task-del-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.8rem;
+    color: var(--accent2);
+  }
+
+  .timeline-section {
+    padding: 2rem 4rem 4rem;
+  }
+
+  .timeline-section h2 {
+    font-family: 'Syne', sans-serif;
+    font-size: 1.3rem;
+    font-weight: 700;
+    margin-bottom: 2rem;
+  }
+
+  .timeline {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+
+  .tl-phase {
+    padding: 1.5rem;
+    border-right: 1px solid var(--border);
+  }
+
+  .tl-phase:last-child { border-right: none; }
+
+  .tl-week {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.62rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--text-dimmer);
+    margin-bottom: 0.6rem;
+  }
+
+  .tl-name {
+    font-family: 'Syne', sans-serif;
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 1rem;
+  }
+
+  .tl-items {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  .tl-item {
+    font-size: 0.78rem;
+    color: var(--text-dim);
+    padding: 0.3rem 0.5rem;
+    background: rgba(255,255,255,0.03);
+    border-radius: 3px;
+    border-left: 2px solid var(--text-dimmer);
+  }
+
+  .tl-phase:nth-child(1) .tl-item { border-left-color: #52b788; }
+  .tl-phase:nth-child(2) .tl-item { border-left-color: #e76f51; }
+  .tl-phase:nth-child(3) .tl-item { border-left-color: #74b3ce; }
+  .tl-phase:nth-child(4) .tl-item { border-left-color: #b185db; }
+
+  /* Responsive tweaks */
+  @media (max-width: 900px) {
+    .flow-grid { grid-template-columns: repeat(2, 1fr); }
+    .wins-grid { grid-template-columns: 1fr 1fr; }
+    .dev-grid { grid-template-columns: 1fr; }
+    .task-body { grid-template-columns: 1fr; }
+    .timeline { grid-template-columns: repeat(2, 1fr); }
+    nav { padding: 0 1rem; }
+    .nav-logo { margin-right: 1rem; font-size: 0.75rem; }
+    .overview-hero, .map-hero, .dev-hero, .tasks-hero, .visual-hero,
+    .wins-section, .tools-section, .story-flow,
+    .tasks-container, .timeline-section, .data-flow-section { padding-left: 1.5rem; padding-right: 1.5rem; }
+    .result-box { margin-left: 1.5rem; margin-right: 1.5rem; }
+    .map-canvas { padding-left: 1rem; padding-right: 1rem; }
+  }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-logo">⬡ AVEP</div>
+  <div class="nav-tabs" role="tablist" aria-label="Architecture sections">
+    <button type="button" class="nav-tab active" role="tab" aria-selected="true" aria-controls="overview" data-tab="overview"><span class="tab-icon">🗺</span> Overview</button>
+    <button type="button" class="nav-tab" role="tab" aria-selected="false" aria-controls="map" data-tab="map"><span class="tab-icon">◫</span> System Map</button>
+    <button type="button" class="nav-tab" role="tab" aria-selected="false" aria-controls="visual" data-tab="visual"><span class="tab-icon">🧸</span> Simple View</button>
+    <button type="button" class="nav-tab" role="tab" aria-selected="false" aria-controls="developer" data-tab="developer"><span class="tab-icon">⌨️</span> Developer</button>
+    <button type="button" class="nav-tab" role="tab" aria-selected="false" aria-controls="tasks" data-tab="tasks"><span class="tab-icon">📋</span> Roadmap</button>
+  </div>
+</nav>
+
+<!-- ════════════════════ OVERVIEW ════════════════════ -->
+<section id="overview" class="active">
+
+  <div class="overview-hero">
+    <div class="badge badge-orange">Architecture Document · v1.1 · Current Implementation</div>
+    <h1>Autonomous Video<br><span>Editing Pipeline</span></h1>
+    <p>A 4-layer agentic system that separates content intelligence from media processing — turning raw footage into a validated rough cut while preserving the original source file.</p>
+  </div>
+
+  <div class="flow-grid">
+    <div class="flow-card flow-l1">
+      <div class="flow-num">LAYER 01</div>
+      <span class="flow-icon">👁</span>
+      <div class="flow-title">Perception</div>
+      <div class="flow-sub">Sensory Input</div>
+      <div class="flow-desc">Converts raw video/audio into structured data. Runs Faster-Whisper, Silero VAD, and optional DeepFilterNet locally. NVIDIA uses CUDA; Apple Silicon transcription uses CPU.</div>
+      <div class="flow-arrow">→</div>
+    </div>
+    <div class="flow-card flow-l2">
+      <div class="flow-num">LAYER 02</div>
+      <span class="flow-icon">🧠</span>
+      <div class="flow-title">Decision Agent</div>
+      <div class="flow-sub">The Brain</div>
+      <div class="flow-desc">Provider-scoped LLM calls or local heuristics produce a schema-validated JSON edit plan with bounded, non-overlapping timestamps.</div>
+      <div class="flow-arrow">→</div>
+    </div>
+    <div class="flow-card flow-l3">
+      <div class="flow-num">LAYER 03</div>
+      <span class="flow-icon">🔗</span>
+      <div class="flow-title">Metadata Bridge</div>
+      <div class="flow-sub">The Glue</div>
+      <div class="flow-desc">Exports media-linked FCPXML, EDL, and OTIO timelines from the edit plan for review or continued work in an NLE.</div>
+      <div class="flow-arrow">→</div>
+    </div>
+    <div class="flow-card flow-l4">
+      <div class="flow-num">LAYER 04</div>
+      <span class="flow-icon">💪</span>
+      <div class="flow-title">Execution</div>
+      <div class="flow-sub">The Muscles</div>
+      <div class="flow-desc">FFmpeg reads the validated edit plan and renders with VideoToolbox or NVENC when usable, automatically retries with libx264 when needed, then verifies the output with ffprobe.</div>
+    </div>
+  </div>
+
+  <div class="wins-section">
+    <h2>Why This Architecture Wins</h2>
+    <div class="wins-grid">
+      <div class="win-card">
+        <div class="win-icon">🛡</div>
+        <div class="win-title">Non-Destructive</div>
+        <div class="win-desc">The original footage is <em>never altered</em>. Timeline exports reference it, while FFmpeg writes a separate rendered output.</div>
+      </div>
+      <div class="win-card">
+        <div class="win-icon">🎛</div>
+        <div class="win-title">Multimodal</div>
+        <div class="win-desc">The agent simultaneously "hears" silence via VAD and "reads" intent via the transcript — combining acoustic and semantic signals.</div>
+      </div>
+      <div class="win-card">
+        <div class="win-icon">⚡</div>
+        <div class="win-title">GPU-Efficient</div>
+        <div class="win-desc">The renderer detects supported hardware encoders and falls back to libx264. Performance depends on device, model size, and source duration.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tools-section">
+    <h2>Tool Stack Summary</h2>
+    <table class="tools-table">
+      <thead>
+        <tr>
+          <th>Function</th>
+          <th>Primary Tool</th>
+          <th>Strategy</th>
+          <th>Layer</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Transcription</td>
+          <td>Faster-Whisper</td>
+          <td><span class="tag tag-local">Local · Offline</span></td>
+          <td>Layer 1</td>
+        </tr>
+        <tr>
+          <td>Silence / VAD</td>
+          <td>Silero VAD</td>
+          <td><span class="tag tag-local">Local · Offline</span></td>
+          <td>Layer 1</td>
+        </tr>
+        <tr>
+          <td>Noise Reduction</td>
+          <td>DeepFilterNet</td>
+          <td><span class="tag tag-local">Local · Offline</span></td>
+          <td>Layer 1</td>
+        </tr>
+        <tr>
+          <td>Decision Logic</td>
+          <td>Claude / OpenAI / Gemini / Ollama</td>
+          <td><span class="tag tag-hybrid">Cloud or Local</span></td>
+          <td>Layer 2</td>
+        </tr>
+        <tr>
+          <td>Timeline Assembly</td>
+          <td>OpenTimelineIO + adapters</td>
+          <td><span class="tag tag-local">Local · Offline</span></td>
+          <td>Layer 3</td>
+        </tr>
+        <tr>
+          <td>Final Render</td>
+          <td>FFmpeg</td>
+          <td><span class="tag tag-local">Local · GPU-Heavy</span></td>
+          <td>Layer 4</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+</section>
+
+<!-- ════════════════════ SYSTEM MAP ════════════════════ -->
+<section id="map">
+  <div class="map-hero">
+    <div class="badge badge-blue">One-Page Architecture · Implementation Map</div>
+    <h1>The Whole Repository at a Glance</h1>
+    <p>Follow the implemented path from web and CLI entry points through perception and validated decisions, then into media-linked NLE exports or the verified FFmpeg render.</p>
+    <div class="map-actions">
+      <a class="map-action" href="assets/avep-architecture.svg" download>Download SVG</a>
+      <a class="map-action" href="assets/avep-architecture.png" download>Download PNG</a>
+    </div>
+  </div>
+  <div class="map-canvas">
+    <img src="assets/avep-architecture.svg" alt="AVEP repository architecture: interfaces feed a FIFO queue, then perception and a validated decision agent branch into NLE timeline export and verified FFmpeg rendering, with per-video artifact storage and planned features shown separately.">
+  </div>
+</section>
+
+<!-- ════════════════════ SIMPLE VIEW ════════════════════ -->
+<section id="visual">
+
+  <div class="visual-hero">
+    <div class="badge badge-teal">Simple View · Explained for Anyone</div>
+    <h1>How AVEP Works<br>🤖✂️🎬</h1>
+    <p>Imagine a robot that watches your video, decides what to keep, and hands a perfect edit to a professional video machine — all automatically.</p>
+  </div>
+
+  <div class="story-flow">
+
+    <div class="story-step s1">
+      <div class="step-emoji-box">🎙️</div>
+      <div class="step-line-area">
+        <div class="step-dot"></div>
+        <div class="step-line"></div>
+      </div>
+      <div class="step-content">
+        <div class="step-label">Layer 1 · Perception</div>
+        <div class="step-title">The Robot Listens 👂</div>
+        <div class="step-plain">
+          Your video goes in. Whisper produces a word-level transcript, while Silero VAD maps speech and silence. Optional noise reduction can improve difficult audio before transcription.
+        </div>
+        <span class="step-analogy">🧠 Like a friend writing down everything you said while watching your video</span>
+      </div>
+    </div>
+
+    <div class="story-step s2">
+      <div class="step-emoji-box">🤔</div>
+      <div class="step-line-area">
+        <div class="step-dot"></div>
+        <div class="step-line"></div>
+      </div>
+      <div class="step-content">
+        <div class="step-label">Layer 2 · Decision Agent</div>
+        <div class="step-title">The Brain Decides 🧠</div>
+        <div class="step-plain">
+          A selected cloud or local model reads the transcript and proposes what to keep and remove. AVEP validates every timestamp before the plan can reach the timeline exporter or renderer.
+        </div>
+        <span class="step-analogy">✂️ Like a film director marking a script with a red pen</span>
+      </div>
+    </div>
+
+    <div class="story-step s3">
+      <div class="step-emoji-box">📋</div>
+      <div class="step-line-area">
+        <div class="step-dot"></div>
+        <div class="step-line"></div>
+      </div>
+      <div class="step-content">
+        <div class="step-label">Layer 3 · Metadata Bridge</div>
+        <div class="step-title">The Instructions 📝</div>
+        <div class="step-plain">
+          AVEP writes media-linked FCPXML, EDL, and OTIO recipe files for professional editors. These reference the original footage rather than modifying it.
+        </div>
+        <span class="step-analogy">🗺️ Like GPS directions for a video editor — never touching the road, just giving instructions</span>
+      </div>
+    </div>
+
+    <div class="story-step s4">
+      <div class="step-emoji-box">🎬</div>
+      <div class="step-line-area">
+        <div class="step-dot"></div>
+        <div class="step-line"></div>
+      </div>
+      <div class="step-content">
+        <div class="step-label">Layer 4 · Execution</div>
+        <div class="step-title">The Powerful Machine Renders 💪</div>
+        <div class="step-plain">
+          FFmpeg applies the validated cuts, selects an available hardware encoder when possible, writes a separate MP4, and checks that the result is a valid video. The exported timeline can also be opened manually in an NLE.
+        </div>
+        <span class="step-analogy">🏭 Like a factory that follows the blueprint to build the final product at full speed</span>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="result-box">
+    <div class="result-emoji">🎉</div>
+    <div class="result-text">
+      <h3>The Magic Result</h3>
+      <p>You drop in a raw recording. AVEP transcribes, analyzes, validates, exports timelines, and produces a separate rough-cut MP4 while leaving the original source untouched.</p>
+    </div>
+  </div>
+
+</section>
+
+<!-- ════════════════════ DEVELOPER ════════════════════ -->
+<section id="developer">
+
+  <div class="dev-hero">
+    <div class="badge badge-yellow">Developer Reference · Technical Spec</div>
+    <h1>Architecture Deep Dive</h1>
+    <p>Complete technical breakdown of each layer, data contracts, toolchain specs, and integration points for engineers building or extending AVEP.</p>
+  </div>
+
+  <div class="dev-grid">
+
+    <!-- Layer 1 -->
+    <div class="dev-card">
+      <div class="dev-card-header">
+        <span class="dev-layer-tag" style="background:rgba(82,183,136,0.15);color:#52b788;border:1px solid rgba(82,183,136,0.25)">L1</span>
+        <h3 style="color:#52b788">Perception Layer</h3>
+      </div>
+
+      <div class="dev-section-label">Entry Point</div>
+      <div class="spec-list">
+        <div class="spec-item"><strong>Input:</strong> Raw .mp4 / .mov / .wav</div>
+        <div class="spec-item"><strong>Output:</strong> JSON transcript with word-level timestamps + VAD silence map</div>
+      </div>
+
+      <div class="dev-section-label">Transcription Engine</div>
+      <div class="code-block"><span class="code-comment"># faster-whisper setup</span>
+<span class="code-kw">from</span> faster_whisper <span class="code-kw">import</span> WhisperModel
+
+model = <span class="code-fn">WhisperModel</span>(
+    <span class="code-str">"large-v3"</span>,
+    device=<span class="code-str">"cuda"</span>,      <span class="code-comment"># CPU on Apple; CTranslate2 has no MPS backend</span>
+    compute_type=<span class="code-str">"float16"</span> <span class="code-comment"># int8 on CPU</span>
+)
+segments, info = model.<span class="code-fn">transcribe</span>(
+    audio_path,
+    word_timestamps=<span class="code-kw">True</span>,
+    vad_filter=<span class="code-kw">True</span>
+)</div>
+
+      <div class="dev-section-label">VAD / Silence Detection</div>
+      <div class="code-block"><span class="code-comment"># silero-vad for silence map</span>
+<span class="code-kw">import</span> torch
+
+vad_model, utils = torch.<span class="code-fn">hub.load</span>(
+    repo_or_dir=<span class="code-str">'snakers4/silero-vad'</span>,
+    model=<span class="code-str">'silero_vad'</span>
+)
+<span class="code-comment"># Returns list of (start_ms, end_ms) speech segments</span></div>
+
+      <div class="dev-section-label">Noise Reduction</div>
+      <div class="spec-list">
+        <div class="spec-item"><strong>Tool:</strong> DeepFilterNet v2 (local Python model)</div>
+        <div class="spec-item">Run before transcription for cleaner word boundaries</div>
+        <div class="spec-item">Outputs cleaned .wav; original audio is <em>preserved</em></div>
+      </div>
+    </div>
+
+    <!-- Layer 2 -->
+    <div class="dev-card">
+      <div class="dev-card-header">
+        <span class="dev-layer-tag" style="background:rgba(231,111,81,0.15);color:#e76f51;border:1px solid rgba(231,111,81,0.25)">L2</span>
+        <h3 style="color:#e76f51">Decision Agent</h3>
+      </div>
+
+      <div class="dev-section-label">Agent System Prompt Pattern</div>
+      <div class="code-block"><span class="code-var">SYSTEM</span> = <span class="code-str">"""
+You are a professional video editor AI.
+Given a timestamped transcript, output a JSON
+'edit_plan' with these fields:
+- keep_segments: [{start, end, reason}]
+- remove_segments: [{start, end, reason}]
+- flag_zoom: [{start, end}]
+Return ONLY valid JSON. No prose.
+"""</span></div>
+
+      <div class="dev-section-label">Edit Plan Output Schema</div>
+      <div class="code-block">{
+  <span class="code-str">"keep_segments"</span>: [
+    { <span class="code-str">"start"</span>: <span class="code-num">0.0</span>, <span class="code-str">"end"</span>: <span class="code-num">12.4</span>, <span class="code-str">"reason"</span>: <span class="code-str">"clean take"</span> }
+  ],
+  <span class="code-str">"remove_segments"</span>: [
+    { <span class="code-str">"start"</span>: <span class="code-num">12.4</span>, <span class="code-str">"end"</span>: <span class="code-num">14.1</span>, <span class="code-str">"reason"</span>: <span class="code-str">"filler: um"</span> }
+  ],
+  <span class="code-str">"flag_zoom"</span>: [
+    { <span class="code-str">"start"</span>: <span class="code-num">45.2</span>, <span class="code-str">"end"</span>: <span class="code-num">48.0</span> }
+  ]
+}</div>
+
+      <div class="dev-section-label">Decision Modes</div>
+      <div class="spec-list">
+        <div class="spec-item"><strong>Heuristic mode:</strong> removes silence &gt;0.8s and single-word fillers without an LLM</div>
+        <div class="spec-item"><strong>LLM mode:</strong> transcript correction followed by provider-scoped edit planning</div>
+        <div class="spec-item"><strong>Validation:</strong> finite, bounded, ordered, non-overlapping edit segments</div>
+        <div class="spec-item"><strong>Planned:</strong> deterministic repeated-take detection and applied zoom effects</div>
+      </div>
+    </div>
+
+    <!-- Layer 3 -->
+    <div class="dev-card">
+      <div class="dev-card-header">
+        <span class="dev-layer-tag" style="background:rgba(116,179,206,0.15);color:#74b3ce;border:1px solid rgba(116,179,206,0.25)">L3</span>
+        <h3 style="color:#74b3ce">Metadata Bridge</h3>
+      </div>
+
+      <div class="dev-section-label">OpenTimelineIO (OTIO)</div>
+      <div class="code-block"><span class="code-kw">import</span> opentimelineio <span class="code-kw">as</span> otio
+
+timeline = otio.<span class="code-fn">Timeline</span>(name=<span class="code-str">"AVEP_Edit"</span>)
+track = otio.<span class="code-fn">Track</span>(name=<span class="code-str">"V1"</span>)
+
+<span class="code-kw">for</span> seg <span class="code-kw">in</span> edit_plan[<span class="code-str">"keep_segments"</span>]:
+    clip = otio.<span class="code-fn">Clip</span>(
+        source_range=otio.TimeRange(
+            start_time=otio.<span class="code-fn">RationalTime</span>(
+                seg[<span class="code-str">"start"</span>] * fps, fps),
+            duration=otio.<span class="code-fn">RationalTime</span>(
+                (seg[<span class="code-str">"end"</span>] - seg[<span class="code-str">"start"</span>]) * fps, fps)
+        )
+    )
+    track.<span class="code-fn">append</span>(clip)
+
+<span class="code-comment"># Export FCPXML for DaVinci / Resolve</span>
+otio.adapters.<span class="code-fn">write_to_file</span>(
+    timeline, <span class="code-str">"output.fcpxml"</span>
+)</div>
+
+      <div class="dev-section-label">Supported Export Formats</div>
+      <div class="spec-list">
+        <div class="spec-item"><strong>FCPXML</strong> — DaVinci Resolve, Final Cut Pro</div>
+        <div class="spec-item"><strong>EDL (CMX 3600)</strong> — Universal NLE compatibility</div>
+        <div class="spec-item"><strong>OTIO JSON</strong> — Internal interchange, version control</div>
+      </div>
+    </div>
+
+    <!-- Layer 4 -->
+    <div class="dev-card">
+      <div class="dev-card-header">
+        <span class="dev-layer-tag" style="background:rgba(177,133,219,0.15);color:#b185db;border:1px solid rgba(177,133,219,0.25)">L4</span>
+        <h3 style="color:#b185db">Execution Layer</h3>
+      </div>
+
+      <div class="dev-section-label">Implemented Render Path</div>
+      <div class="code-block"><span class="code-comment"># validated edit_plan.json → FFmpeg select/aselect</span>
+plan = <span class="code-fn">validate_edit_plan</span>(plan, duration=media_duration)
+video_filter = <span class="code-str">"select='between(t,start,end)+...',setpts=N/FRAME_RATE/TB"</span>
+audio_filter = <span class="code-str">"aselect='between(t,start,end)+...',asetpts=N/SR/TB"</span>
+
+<span class="code-comment"># Render to a temporary MP4, verify with ffprobe, then atomically publish</span></div>
+
+      <div class="dev-section-label">FFmpeg Fallback (No Resolve)</div>
+      <div class="code-block"><span class="code-comment"># Mac: VideoToolbox hardware encode</span>
+ffmpeg -i input.mp4 \
+  -vf <span class="code-str">"select='...'"</span> \
+  -c:v h264_videotoolbox \
+  -b:v <span class="code-num">8000</span>k output.mp4
+
+<span class="code-comment"># NVIDIA: NVENC hardware encode</span>
+ffmpeg -i input.mp4 \
+  -c:v h264_nvenc \
+  -preset p7 -b:v <span class="code-num">8000</span>k output.mp4</div>
+
+      <div class="dev-section-label">Reliability Guarantees</div>
+      <div class="spec-list">
+        <div class="spec-item">Invalid or empty edit plans fail before rendering</div>
+        <div class="spec-item">Advertised hardware encoders automatically fall back to libx264 if startup fails</div>
+        <div class="spec-item">Partial output is never published as the final result</div>
+        <div class="spec-item">Final output must pass ffprobe validation</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Data flow pipeline viz -->
+  <div class="data-flow-section">
+    <h2>Data Flow At a Glance</h2>
+    <div class="pipeline-viz">
+      <div class="pipeline-stage">
+        <div class="pipeline-stage-num">STAGE 01</div>
+        <div class="pipeline-stage-name" style="color:#52b788">Perception</div>
+        <div class="pipeline-io-label">Input</div>
+        <div class="pipeline-input">video.mp4</div>
+        <div class="pipeline-io-label">Output</div>
+        <div class="pipeline-output">raw_words.json</div>
+        <div class="pipeline-output">silence_noise_map.json</div>
+        <div class="pipeline-output">clean_audio.wav</div>
+      </div>
+      <div class="pipeline-stage">
+        <div class="pipeline-stage-num">STAGE 02</div>
+        <div class="pipeline-stage-name" style="color:#e76f51">Decision</div>
+        <div class="pipeline-io-label">Input</div>
+        <div class="pipeline-input">raw_words.json</div>
+        <div class="pipeline-input">silence_noise_map.json</div>
+        <div class="pipeline-io-label">Output</div>
+        <div class="pipeline-output">edit_plan.json</div>
+        <div class="pipeline-output">corrected.srt</div>
+      </div>
+      <div class="pipeline-stage">
+        <div class="pipeline-stage-num">STAGE 03</div>
+        <div class="pipeline-stage-name" style="color:#74b3ce">Metadata Bridge</div>
+        <div class="pipeline-io-label">Input</div>
+        <div class="pipeline-input">edit_plan.json</div>
+        <div class="pipeline-io-label">Output</div>
+        <div class="pipeline-output">timeline.fcpxml</div>
+        <div class="pipeline-output">timeline.edl</div>
+        <div class="pipeline-output">timeline.otio</div>
+      </div>
+      <div class="pipeline-stage">
+        <div class="pipeline-stage-num">STAGE 04</div>
+        <div class="pipeline-stage-name" style="color:#b185db">Execution</div>
+        <div class="pipeline-io-label">Input</div>
+        <div class="pipeline-input">edit_plan.json</div>
+        <div class="pipeline-input">video.mp4 (src)</div>
+        <div class="pipeline-io-label">Output</div>
+        <div class="pipeline-output">final_cut.mp4 ✓</div>
+      </div>
+    </div>
+  </div>
+
+</section>
+
+<!-- ════════════════════ TASKS ════════════════════ -->
+<section id="tasks">
+
+  <div class="tasks-hero">
+    <div class="badge badge-blue">Engineering Roadmap · Current Status</div>
+    <h1>Hardening and Next Features</h1>
+    <p>The core pipeline is implemented. These original layer assignments now serve as a roadmap: reliability work is active, while deterministic duplicate detection, applied zoom effects, persistent jobs, and optional Resolve automation remain planned.</p>
+  </div>
+
+  <div class="tasks-container">
+
+    <!-- Task 1 -->
+    <div class="task-block">
+      <div class="task-header">
+        <div class="task-header-left">
+          <span class="task-num">TASK-01</span>
+          <span class="dev-layer-tag" style="background:rgba(82,183,136,0.15);color:#52b788;border:1px solid rgba(82,183,136,0.25)">Layer 1</span>
+          <div class="task-title">Harden the Perception Layer</div>
+        </div>
+        <span class="task-status status-start">Implemented · Needs E2E Tests</span>
+      </div>
+      <div class="task-body">
+        <div class="task-col">
+          <div class="task-col-label">What to Build</div>
+          <ul>
+            <li><span class="li-dot"></span>Python script that accepts a video file path as CLI argument</li>
+            <li><span class="li-dot"></span>Runs Faster-Whisper with word-level timestamps</li>
+            <li><span class="li-dot"></span>Runs Silero-VAD to detect silence regions</li>
+            <li><span class="li-dot"></span>Optionally runs DeepFilterNet for audio cleaning</li>
+            <li><span class="li-dot"></span>Outputs a single <code>perception_output.json</code></li>
+          </ul>
+        </div>
+        <div class="task-col">
+          <div class="task-col-label">Prerequisites / Setup</div>
+          <ul>
+            <li><span class="li-dot"></span><code>pip install faster-whisper silero-vad torch</code></li>
+            <li><span class="li-dot"></span>CUDA for NVIDIA; CPU fallback on Apple Silicon and other systems</li>
+            <li><span class="li-dot"></span>ffmpeg installed on system PATH</li>
+            <li><span class="li-dot"></span>A sample raw video file for testing (~5 min)</li>
+          </ul>
+        </div>
+        <div class="task-col">
+          <div class="task-col-label">Success Criteria</div>
+          <ul>
+            <li><span class="li-dot"></span>Output JSON contains word-level timestamps accurate to ±0.1s</li>
+            <li><span class="li-dot"></span>Silence regions &gt; 0.5s are all captured in the map</li>
+            <li><span class="li-dot"></span>Script completes in under 5 min for a 1-hour video on GPU</li>
+            <li><span class="li-dot"></span>Works without GPU (slower) as a fallback</li>
+          </ul>
+        </div>
+      </div>
+      <div class="task-deliverable">
+        <span class="task-del-label">Deliverable →</span>
+        <span class="task-del-value">perception.py + perception_output.json schema + README.md</span>
+      </div>
+    </div>
+
+    <!-- Task 2 -->
+    <div class="task-block">
+      <div class="task-header">
+        <div class="task-header-left">
+          <span class="task-num">TASK-02</span>
+          <span class="dev-layer-tag" style="background:rgba(231,111,81,0.15);color:#e76f51;border:1px solid rgba(231,111,81,0.25)">Layer 2</span>
+          <div class="task-title">Expand the Decision Agent</div>
+        </div>
+        <span class="task-status status-mid">Implemented · Creative Logic Planned</span>
+      </div>
+      <div class="task-body">
+        <div class="task-col">
+          <div class="task-col-label">What to Build</div>
+          <ul>
+            <li><span class="li-dot"></span>Python agent that reads <code>perception_output.json</code></li>
+            <li><span class="li-dot"></span>Pre-processing heuristics: silence removal, filler word regex</li>
+            <li><span class="li-dot"></span>Repeated take detection using sentence similarity</li>
+            <li><span class="li-dot"></span>LLM call (Gemini/GPT-4o) for intent analysis</li>
+            <li><span class="li-dot"></span>Outputs <code>edit_plan.json</code> (keep/remove/zoom segments)</li>
+          </ul>
+        </div>
+        <div class="task-col">
+          <div class="task-col-label">Prerequisites / Setup</div>
+          <ul>
+            <li><span class="li-dot"></span>OpenAI or Google Gemini API key in <code>.env</code></li>
+            <li><span class="li-dot"></span><code>pip install openai google-genai python-dotenv</code></li>
+            <li><span class="li-dot"></span>perception_output.json from Task-01</li>
+            <li><span class="li-dot"></span>Review the JSON schema before coding the prompt</li>
+          </ul>
+        </div>
+        <div class="task-col">
+          <div class="task-col-label">Success Criteria</div>
+          <ul>
+            <li><span class="li-dot"></span>All filler words ("um", "uh", "like") are flagged for removal</li>
+            <li><span class="li-dot"></span>Duplicate takes: only the last repetition is kept</li>
+            <li><span class="li-dot"></span>Output JSON validates against the agreed schema</li>
+            <li><span class="li-dot"></span>Agent runs for &lt;60 tokens cost per minute of video</li>
+          </ul>
+        </div>
+      </div>
+      <div class="task-deliverable">
+        <span class="task-del-label">Deliverable →</span>
+        <span class="task-del-value">agent.py + edit_plan.json sample + prompt_template.txt</span>
+      </div>
+    </div>
+
+    <!-- Task 3 -->
+    <div class="task-block">
+      <div class="task-header">
+        <div class="task-header-left">
+          <span class="task-num">TASK-03</span>
+          <span class="dev-layer-tag" style="background:rgba(116,179,206,0.15);color:#74b3ce;border:1px solid rgba(116,179,206,0.25)">Layer 3</span>
+          <div class="task-title">Validate NLE Interoperability</div>
+        </div>
+        <span class="task-status status-mid">Media-Linked Export Implemented</span>
+      </div>
+      <div class="task-body">
+        <div class="task-col">
+          <div class="task-col-label">What to Build</div>
+          <ul>
+            <li><span class="li-dot"></span>Python script reading <code>edit_plan.json</code></li>
+            <li><span class="li-dot"></span>Generate OTIO timeline object from keep segments</li>
+            <li><span class="li-dot"></span>Export <code>.fcpxml</code> for Resolve and <code>.edl</code> for NLE fallback</li>
+            <li><span class="li-dot"></span>Frame-accurate timing using source video's FPS metadata</li>
+          </ul>
+        </div>
+        <div class="task-col">
+          <div class="task-col-label">Prerequisites / Setup</div>
+          <ul>
+            <li><span class="li-dot"></span><code>pip install opentimelineio</code></li>
+            <li><span class="li-dot"></span>Read OTIO docs for FCPXML adapter</li>
+            <li><span class="li-dot"></span>Understand the source video FPS (24, 30, 60)</li>
+            <li><span class="li-dot"></span>DaVinci Resolve installed for validation</li>
+          </ul>
+        </div>
+        <div class="task-col">
+          <div class="task-col-label">Success Criteria</div>
+          <ul>
+            <li><span class="li-dot"></span>FCPXML imports into DaVinci Resolve without errors</li>
+            <li><span class="li-dot"></span>Timeline matches expected cut points from edit_plan.json</li>
+            <li><span class="li-dot"></span>Zero quality loss — original source media referenced only</li>
+            <li><span class="li-dot"></span>EDL file imports into at least one other NLE (Premiere)</li>
+          </ul>
+        </div>
+      </div>
+      <div class="task-deliverable">
+        <span class="task-del-label">Deliverable →</span>
+        <span class="task-del-value">bridge.py + output.fcpxml sample + output.edl sample</span>
+      </div>
+    </div>
+
+    <!-- Task 4 -->
+    <div class="task-block">
+      <div class="task-header">
+        <div class="task-header-left">
+          <span class="task-num">TASK-04</span>
+          <span class="dev-layer-tag" style="background:rgba(177,133,219,0.15);color:#b185db;border:1px solid rgba(177,133,219,0.25)">Layer 4</span>
+          <div class="task-title">Advance Rendering and NLE Automation</div>
+        </div>
+        <span class="task-status status-adv">FFmpeg Implemented · Resolve Planned</span>
+      </div>
+      <div class="task-body">
+        <div class="task-col">
+          <div class="task-col-label">What to Build</div>
+          <ul>
+            <li><span class="li-dot"></span>Python script using DaVinci Resolve's scripting API</li>
+            <li><span class="li-dot"></span>Auto-import the FCPXML timeline from Task-03</li>
+            <li><span class="li-dot"></span>Apply a color grade LUT (optional but ideal)</li>
+            <li><span class="li-dot"></span>Set render codec to H264 with hardware acceleration</li>
+            <li><span class="li-dot"></span>Trigger render and monitor completion</li>
+          </ul>
+        </div>
+        <div class="task-col">
+          <div class="task-col-label">Prerequisites / Setup</div>
+          <ul>
+            <li><span class="li-dot"></span>DaVinci Resolve Studio (not free version)</span></li>
+            <li><span class="li-dot"></span>Enable "External Scripting" in Resolve preferences</li>
+            <li><span class="li-dot"></span>Python path configured to use Resolve's bundled Python</li>
+            <li><span class="li-dot"></span>FCPXML from Task-03 ready to import</li>
+          </ul>
+        </div>
+        <div class="task-col">
+          <div class="task-col-label">Success Criteria</div>
+          <ul>
+            <li><span class="li-dot"></span>Script runs end-to-end without manual UI interaction</li>
+            <li><span class="li-dot"></span>Final MP4 output is generated at target bitrate</li>
+            <li><span class="li-dot"></span>Hardware encoder (videotoolbox / nvenc) is confirmed active</li>
+            <li><span class="li-dot"></span>FFmpeg fallback script also provided for non-Resolve users</li>
+          </ul>
+        </div>
+      </div>
+      <div class="task-deliverable">
+        <span class="task-del-label">Deliverable →</span>
+        <span class="task-del-value">render.py (Resolve) + render_ffmpeg.py (fallback) + final_cut.mp4</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Timeline -->
+  <div class="timeline-section">
+    <h2>Suggested Build Timeline</h2>
+    <div class="timeline">
+      <div class="tl-phase">
+        <div class="tl-week">Week 1</div>
+        <div class="tl-name">Perception Layer</div>
+        <div class="tl-items">
+          <div class="tl-item">Set up Whisper environment</div>
+          <div class="tl-item">Implement VAD silence detection</div>
+          <div class="tl-item">Test on sample 5-min clip</div>
+          <div class="tl-item">Finalize JSON output schema</div>
+        </div>
+      </div>
+      <div class="tl-phase">
+        <div class="tl-week">Week 2</div>
+        <div class="tl-name">Decision Agent</div>
+        <div class="tl-items">
+          <div class="tl-item">Write heuristic pre-filters</div>
+          <div class="tl-item">Design & test LLM prompt</div>
+          <div class="tl-item">Validate edit_plan schema</div>
+          <div class="tl-item">Cost & latency benchmarks</div>
+        </div>
+      </div>
+      <div class="tl-phase">
+        <div class="tl-week">Week 3</div>
+        <div class="tl-name">Metadata Bridge</div>
+        <div class="tl-items">
+          <div class="tl-item">OTIO timeline builder</div>
+          <div class="tl-item">FCPXML export & validation</div>
+          <div class="tl-item">EDL fallback export</div>
+          <div class="tl-item">Import test in Resolve</div>
+        </div>
+      </div>
+      <div class="tl-phase">
+        <div class="tl-week">Week 4</div>
+        <div class="tl-name">Execution + Integration</div>
+        <div class="tl-items">
+          <div class="tl-item">Resolve Python API script</div>
+          <div class="tl-item">Hardware render validation</div>
+          <div class="tl-item">Full end-to-end pipeline test</div>
+          <div class="tl-item">FFmpeg fallback + docs</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</section>
+
+<script>
+  const tabs = document.querySelectorAll('.nav-tab');
+  const sections = document.querySelectorAll('section');
+
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      const target = tab.dataset.tab;
+      tabs.forEach(t => t.classList.remove('active'));
+      tabs.forEach(t => t.setAttribute('aria-selected', 'false'));
+      sections.forEach(s => s.classList.remove('active'));
+      tab.classList.add('active');
+      tab.setAttribute('aria-selected', 'true');
+      document.getElementById(target).classList.add('active');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+  });
+</script>
+</body>
+</html>

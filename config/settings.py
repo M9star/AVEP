@@ -11,18 +11,61 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
+def probe_media(video_path: str) -> dict:
+    """Return validated media metadata from ffprobe."""
+    try:
+        result = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_streams", "-show_format",
+             "-of", "json", str(video_path)],
+            capture_output=True, text=True, check=True,
+        )
+        data = json.loads(result.stdout)
+    except (FileNotFoundError, subprocess.CalledProcessError, json.JSONDecodeError) as exc:
+        raise RuntimeError(f"Unable to inspect media file: {video_path}") from exc
+
+    streams = data.get("streams", [])
+    video_stream = next((s for s in streams if s.get("codec_type") == "video"), None)
+    audio_stream = next((s for s in streams if s.get("codec_type") == "audio"), None)
+    if video_stream is None:
+        raise ValueError(f"No video stream found in: {video_path}")
+
+    duration = None
+    for value in (video_stream.get("duration"), data.get("format", {}).get("duration")):
+        try:
+            candidate = float(value)
+        except (TypeError, ValueError):
+            continue
+        if candidate > 0:
+            duration = candidate
+            break
+    if duration is None:
+        raise ValueError(f"Video duration must be positive: {video_path}")
+
+    fps = None
+    for rate in (video_stream.get("avg_frame_rate"), video_stream.get("r_frame_rate")):
+        try:
+            num, den = rate.split("/")
+            candidate = float(num) / float(den)
+        except (AttributeError, TypeError, ValueError, ZeroDivisionError):
+            continue
+        if candidate > 0:
+            fps = candidate
+            break
+    if fps is None:
+        raise ValueError(f"Video frame rate must be positive: {video_path}")
+
+    return {
+        "duration": duration,
+        "fps": round(fps, 3),
+        "has_video": True,
+        "has_audio": audio_stream is not None,
+    }
+
+
 def detect_fps(video_path: str, default: float = 30.0) -> float:
     """Probe video frame rate via ffprobe. Falls back to default if detection fails."""
     try:
-        result = subprocess.run(
-            ["ffprobe", "-v", "error", "-select_streams", "v:0",
-             "-show_entries", "stream=r_frame_rate", "-of", "json", str(video_path)],
-            capture_output=True, text=True, check=True,
-        )
-        rate = json.loads(result.stdout)["streams"][0]["r_frame_rate"]  # e.g. "30000/1001"
-        num, den = rate.split("/")
-        fps = float(num) / float(den)
-        return round(fps, 3) if fps > 0 else default
+        return probe_media(video_path)["fps"]
     except Exception:
         return default
 
@@ -60,6 +103,7 @@ def get_paths(video_path: str) -> dict:
         "edit_plan":             inter / "edit_plan.json",
         "fcpxml_output":         inter / "timeline.fcpxml",
         "edl_output":            inter / "timeline.edl",
+        "otio_output":           inter / "timeline.otio",
         "final_output":          out   / "final_cut.mp4",
     }
 

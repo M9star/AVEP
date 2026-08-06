@@ -2,6 +2,13 @@
 
 A 4-layer agentic system that turns raw footage into a polished edit automatically.
 
+## Architecture Map
+
+[Open the full-resolution SVG](documents/assets/avep-architecture.svg) or
+[download the PNG](documents/assets/avep-architecture.png).
+
+![AVEP repository architecture](documents/assets/avep-architecture.svg)
+
 ## Architecture
 
 ```
@@ -48,6 +55,7 @@ Input Video
 │  Output:                                             │
 │    timeline.fcpxml       import into DaVinci/FCP     │
 │    timeline.edl          import into any NLE         │
+│    timeline.otio         versionable interchange     │
 └──────────────────────────┬──────────────────────────┘
                            │
                            ▼
@@ -79,7 +87,8 @@ data/
 │       ├── perception_output.json
 │       ├── edit_plan.json
 │       ├── timeline.fcpxml
-│       └── timeline.edl
+│       ├── timeline.edl
+│       └── timeline.otio
 └── output/
     └── College-Physics-Lecture/
         └── final_cut.mp4
@@ -110,6 +119,8 @@ Then open:
 - Upload multiple videos — they process one at a time via a FIFO queue
 - Live progress over Server-Sent Events (per-layer status + completion)
 - FPS auto-detected from the video (no manual entry)
+- Edit plans validated before timeline export or rendering
+- Final render verified with ffprobe before a job is marked complete
 - Browse/download every intermediate + output file (`/data`, `/jobs/{id}/files`)
 
 ### API quick reference
@@ -188,12 +199,13 @@ Run Layer 1 first, then ask Claude Code to:
 - **SRT subtitles**: Import `corrected.srt` — creates a captions track
 - **FCPXML timeline**: Import `timeline.fcpxml` into DaVinci Resolve or FCP
 - **EDL timeline**: Import `timeline.edl` into any NLE
+- **OTIO timeline**: Use `timeline.otio` for interchange, inspection, or version control
 
 ## GPU Support
 
 | Platform       | Whisper Device | Render Codec         |
 |----------------|----------------|----------------------|
-| Apple Silicon  | mps            | h264_videotoolbox    |
+| Apple Silicon  | cpu            | h264_videotoolbox    |
 | NVIDIA GPU     | cuda           | h264_nvenc           |
 | CPU only       | cpu            | libx264              |
 
@@ -201,8 +213,10 @@ Run Layer 1 first, then ask Claude Code to:
 
 Set `LLM_PROVIDER` in `.env`:
 
-| Provider | Env Var           | Model           | Cost (per 1M tokens) |
-|----------|-------------------|-----------------|----------------------|
-| claude   | ANTHROPIC_API_KEY | Sonnet 4.6      | $3 / $15             |
-| openai   | OPENAI_API_KEY    | GPT-4o          | $5 / $15             |
-| gemini   | GEMINI_API_KEY    | Gemini 1.5 Pro  | varies               |
+| Provider      | Configuration       | Current integration |
+|---------------|---------------------|---------------------|
+| claude        | ANTHROPIC_API_KEY   | Claude Sonnet 4.6   |
+| openai        | OPENAI_API_KEY      | GPT-4o              |
+| gemini        | GEMINI_API_KEY      | Gemini 2.0 Flash    |
+| ollama        | Local Ollama server | Selected local model|
+| claude_code   | Claude CLI login    | Existing CLI auth   |

@@ -14,6 +14,8 @@ Levenshtein
 
 # Layer 3 — Metadata Bridge
 opentimelineio
+otio-fcpx-xml-adapter
+otio-cmx3600-adapter
 
 # Layer 4 — Execution
 # DaVinci Resolve ships its own Python — no pip install needed
