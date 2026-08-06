@@ -15,7 +15,12 @@ PROMPT_PATH = Path(__file__).parent / "prompts" / "transcript_correction_prompt.
 CHUNK_SIZE = 500
 
 
-def correct_transcript(words: list[dict], subject_hint: str = "") -> dict:
+def correct_transcript(
+    words: list[dict],
+    subject_hint: str = "",
+    provider: str | None = None,
+    ollama_model: str | None = None,
+) -> dict:
     """Send transcript in chunks to LLM for context-aware correction."""
     system_prompt = PROMPT_PATH.read_text()
     all_corrected = []
@@ -31,7 +36,7 @@ def correct_transcript(words: list[dict], subject_hint: str = "") -> dict:
             "subject_hint": subject_hint,
         }, indent=2)
 
-        result = _call_llm(system_prompt, user_content)
+        result = _call_llm(system_prompt, user_content, provider, ollama_model)
         all_corrected.extend(result.get("corrected_words", chunk))
 
         for s in result.get("corrections_summary", []):
@@ -55,26 +60,34 @@ OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.1:8b")
 OLLAMA_URL   = os.getenv("OLLAMA_URL", "http://localhost:11434/v1")
 
 
-def _call_llm(system: str, user: str) -> dict:
-    if LLM_PROVIDER == "ollama":
-        return _call_ollama(system, user)
-    elif LLM_PROVIDER == "claude_code":
+def _call_llm(
+    system: str,
+    user: str,
+    provider: str | None = None,
+    ollama_model: str | None = None,
+) -> dict:
+    provider = provider or LLM_PROVIDER
+
+    if provider == "ollama":
+        return _call_ollama(system, user, ollama_model)
+    elif provider == "claude_code":
         return _call_claude_code(system, user)
-    elif LLM_PROVIDER == "claude":
+    elif provider == "claude":
         return _call_claude(system, user)
-    elif LLM_PROVIDER == "openai":
+    elif provider == "openai":
         return _call_openai(system, user)
-    elif LLM_PROVIDER == "gemini":
+    elif provider == "gemini":
         return _call_gemini(system, user)
     else:
-        raise ValueError(f"Unknown LLM_PROVIDER: {LLM_PROVIDER}")
+        raise ValueError(f"Unknown LLM_PROVIDER: {provider}")
 
 
-def _call_ollama(system: str, user: str) -> dict:
+def _call_ollama(system: str, user: str, model: str | None = None) -> dict:
     from openai import OpenAI
+    model = model or OLLAMA_MODEL
     client = OpenAI(base_url=OLLAMA_URL, api_key="ollama")
     resp = client.chat.completions.create(
-        model=OLLAMA_MODEL,
+        model=model,
         response_format={"type": "json_object"},
         messages=[
             {"role": "system", "content": system},

@@ -12,38 +12,45 @@ load_dotenv()
 PROMPT_PATH = Path(__file__).parent / "prompts" / "editor_prompt.txt"
 
 
-def call_llm(perception_data: dict) -> dict:
+def call_llm(
+    perception_data: dict,
+    provider: str | None = None,
+    ollama_model: str | None = None,
+) -> dict:
     system_prompt = PROMPT_PATH.read_text()
     user_content   = json.dumps({
         "words":    perception_data["words"],
         "silences": perception_data["silences"],
     }, indent=2)
 
-    if LLM_PROVIDER == "ollama":
-        return _call_ollama(system_prompt, user_content)
-    elif LLM_PROVIDER == "claude_code":
+    provider = provider or LLM_PROVIDER
+
+    if provider == "ollama":
+        return _call_ollama(system_prompt, user_content, ollama_model)
+    elif provider == "claude_code":
         return _call_claude_code(system_prompt, user_content)
-    elif LLM_PROVIDER == "claude":
+    elif provider == "claude":
         return _call_claude(system_prompt, user_content)
-    elif LLM_PROVIDER == "openai":
+    elif provider == "openai":
         return _call_openai(system_prompt, user_content)
-    elif LLM_PROVIDER == "gemini":
+    elif provider == "gemini":
         return _call_gemini(system_prompt, user_content)
     else:
-        raise ValueError(f"Unknown LLM_PROVIDER: {LLM_PROVIDER}")
+        raise ValueError(f"Unknown LLM_PROVIDER: {provider}")
 
 
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.1:8b")
 OLLAMA_URL   = os.getenv("OLLAMA_URL", "http://localhost:11434/v1")
 
 
-def _call_ollama(system: str, user: str) -> dict:
+def _call_ollama(system: str, user: str, model: str | None = None) -> dict:
     """Call a local Ollama model via OpenAI-compatible API."""
     from openai import OpenAI
+    model = model or OLLAMA_MODEL
     client = OpenAI(base_url=OLLAMA_URL, api_key="ollama")
-    print(f"  [Agent] Calling Ollama ({OLLAMA_MODEL})...")
+    print(f"  [Agent] Calling Ollama ({model})...")
     resp = client.chat.completions.create(
-        model=OLLAMA_MODEL,
+        model=model,
         response_format={"type": "json_object"},
         messages=[
             {"role": "system", "content": system},

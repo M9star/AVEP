@@ -4,7 +4,7 @@ Run:  python -m layer2_decision.decision --video data/input/myvideo.mp4
 """
 import json
 import argparse
-from config.settings import get_paths
+from config.settings import get_paths, LLM_PROVIDER
 from layer2_decision.heuristics import flag_filler_words, flag_long_silences, build_edit_plan
 from layer2_decision.agent import call_llm
 from layer2_decision.corrector import correct_transcript
@@ -12,24 +12,14 @@ from layer1_perception.subtitle import generate_srt
 
 
 def run(video_path: str, skip_llm: bool = False, subject_hint: str = "", llm_provider: str | None = None):
-    # Override LLM provider for this run if specified (per-job selection from frontend)
-    if llm_provider:
-        import config.settings
-        import layer2_decision.agent as _agent
-        import layer2_decision.corrector as _corrector
-
-        # "ollama:llama3.1:8b" → provider="ollama", model="llama3.1:8b"
-        if llm_provider.startswith("ollama:"):
-            ollama_model = llm_provider.split(":", 1)[1]
-            _agent.OLLAMA_MODEL = ollama_model
-            _corrector.OLLAMA_MODEL = ollama_model
-            llm_provider = "ollama"
-            print(f"  [L2] Using Ollama model: {ollama_model}")
-
-        config.settings.LLM_PROVIDER = llm_provider
-        _agent.LLM_PROVIDER = llm_provider
-        _corrector.LLM_PROVIDER = llm_provider
-        print(f"  [L2] Using LLM provider: {llm_provider}")
+    # Resolve provider per invocation so one queued job cannot affect the next.
+    provider = llm_provider or LLM_PROVIDER
+    ollama_model = None
+    if provider.startswith("ollama:"):
+        ollama_model = provider.split(":", 1)[1]
+        provider = "ollama"
+        print(f"  [L2] Using Ollama model: {ollama_model}")
+    print(f"  [L2] Using LLM provider: {provider}")
 
     paths = get_paths(video_path)
     paths["inter_dir"].mkdir(parents=True, exist_ok=True)
@@ -54,10 +44,10 @@ def run(video_path: str, skip_llm: bool = False, subject_hint: str = "", llm_pro
         corrected = {"corrected_words": words, "corrections_summary": [], "total_corrections": 0}
     else:
         print("[L2] Running transcript correction...")
-        corrected = correct_transcript(words, subject_hint)
+        corrected = correct_transcript(words, subject_hint, provider, ollama_model)
 
         perception = {"words": corrected["corrected_words"], "silences": silences}
-        edit_plan = call_llm(perception)
+        edit_plan = call_llm(perception, provider, ollama_model)
 
     # Save corrected transcript
     corrected_output = {
